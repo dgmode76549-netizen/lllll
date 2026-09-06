@@ -1,0 +1,556 @@
+{
+  "users": {
+    "7377297098": {
+      "balance": 499080000,
+      "username": "phamdung200910",
+      "name": "Dũng Phạm",
+      "lastSeen": 1788674450179
+    },
+    "8000696310": {
+      "balance": 150000,
+      "username": "",
+      "name": "Msh Ehk",
+      "lastSeen": 1771570933419
+    },
+    "8501627556": {
+      "balance": 30000,
+      "username": "",
+      "name": "Ok Hha",
+      "lastSeen": 1772802033666
+    },
+    "5793459583": {
+      "balance": 0,
+      "username": "zdnam5",
+      "name": "dnam©️",
+      "lastSeen": 1772801574338
+    },
+    "7767439359": {
+      "balance": 30000,
+      "username": "",
+      "name": "Duymanh Duymanh",
+      "lastSeen": 1773415779029
+    }
+  },
+  "topups": {
+    "NAP_7377297098_VHK8NP": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-01-28T18:26:35.720Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_GVSRNE": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-01-31T14:44:04.126Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_QWC7MH": {
+      "uid": 7377297098,
+      "amount": 10000,
+      "status": "PENDING",
+      "createdAt": "2026-01-31T18:54:12.836Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_6AKGXK": {
+      "uid": 7377297098,
+      "amount": 200000,
+      "status": "PENDING",
+      "createdAt": "2026-01-31T18:54:35.377Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_WW5WPS": {
+      "uid": 7377297098,
+      "amount": 10000,
+      "status": "PENDING",
+      "createdAt": "2026-01-31T19:05:52.632Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_6KT5TJ": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-01-31T19:43:58.715Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_JFSEZF": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:16:09.918Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_JHYDEN": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:31:14.896Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_Y9LM2F": {
+      "uid": 7377297098,
+      "amount": 200000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:31:24.972Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_44KYR2": {
+      "uid": 7377297098,
+      "amount": 200000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:32:08.383Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_LDX4GL": {
+      "uid": 7377297098,
+      "amount": 200000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:32:27.231Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_KYLVLU": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:34:45.371Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_BXXE5S": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:42:28.994Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_ZEXDTA": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:43:21.305Z",
+      "sepayTxId": null
+    },
+    "NAP_7377297098_SSFAYJ": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "status": "PENDING",
+      "createdAt": "2026-02-09T14:47:04.279Z",
+      "sepayTxId": null
+    },
+    "TOPUP_F4D75CBD": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "payContent": "TOPUP TU709867XDWO",
+      "status": "DONE",
+      "createdAt": "2026-02-09T14:49:51.607Z",
+      "paidAt": "2026-02-09T14:51:41.804Z"
+    },
+    "TOPUP_0737F24F": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "payContent": "TOPUP TU7098PEMC39",
+      "status": "PENDING",
+      "createdAt": "2026-02-09T15:10:21.349Z",
+      "paidAt": ""
+    },
+    "TOPUP_0FBB55DF": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "payContent": "TOPUP TU7098L1KBR0",
+      "status": "PENDING",
+      "createdAt": "2026-02-09T15:44:05.803Z",
+      "paidAt": ""
+    },
+    "TOPUP_07948457": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "payContent": "TOPUP TU709836H6KG",
+      "status": "PENDING",
+      "createdAt": "2026-02-14T16:15:20.935Z",
+      "paidAt": ""
+    },
+    "TOPUP_26C50F31": {
+      "uid": 7377297098,
+      "amount": 100000,
+      "payContent": "TOPUP TU7098XLORFW",
+      "status": "PENDING",
+      "createdAt": "2026-02-14T17:01:57.102Z",
+      "paidAt": ""
+    },
+    "TOPUP_66C68DCB": {
+      "uid": 7377297098,
+      "amount": 200000,
+      "payContent": "TOPUP TU7098RFT4B1",
+      "status": "PENDING",
+      "createdAt": "2026-02-18T18:14:45.623Z",
+      "paidAt": ""
+    },
+    "TOPUP_166D7690": {
+      "uid": 8000696310,
+      "amount": 500000,
+      "payContent": "TOPUP TU6310HQH5CG",
+      "status": "PENDING",
+      "createdAt": "2026-02-20T06:58:28.969Z",
+      "paidAt": ""
+    },
+    "TOPUP_C99947D3": {
+      "uid": 8000696310,
+      "amount": 200000,
+      "payContent": "TOPUP TU6310FXYJWT",
+      "status": "DONE",
+      "createdAt": "2026-02-20T06:58:32.285Z",
+      "paidAt": "2026-02-20T06:59:55.302Z"
+    },
+    "TOPUP_348547DA": {
+      "uid": 7377297098,
+      "amount": 200000,
+      "payContent": "TOPUP TU7098N3OTTO",
+      "status": "TIMEOUT",
+      "createdAt": "2026-02-25T16:44:34.973Z",
+      "paidAt": ""
+    },
+    "TOPUP_3A81DDA1": {
+      "uid": 7377297098,
+      "amount": 500000,
+      "payContent": "TOPUP TU7098OZ4Q2G",
+      "status": "PENDING",
+      "createdAt": "2026-03-05T13:10:40.366Z",
+      "paidAt": ""
+    },
+    "TOPUP_46AA9A39": {
+      "uid": 7377297098,
+      "amount": 300000,
+      "payContent": "TOPUP TU7098B3LTNT",
+      "status": "PENDING",
+      "createdAt": "2026-03-05T13:49:08.340Z",
+      "paidAt": ""
+    },
+    "TOPUP_D98ABC2E": {
+      "uid": 7377297098,
+      "amount": 300000,
+      "payContent": "TOPUP TU7098A9GSCI",
+      "status": "TIMEOUT",
+      "createdAt": "2026-03-05T16:07:23.780Z",
+      "paidAt": ""
+    },
+    "TOPUP_2A0CCED0": {
+      "uid": 8501627556,
+      "amount": 300000,
+      "payContent": "TOPUP TU755638YVEO",
+      "status": "TIMEOUT",
+      "createdAt": "2026-03-05T16:08:40.086Z",
+      "paidAt": ""
+    },
+    "TOPUP_ED6FDDCC": {
+      "uid": 7377297098,
+      "amount": 300000,
+      "payContent": "TOPUP TU7098QLMM7Z",
+      "status": "TIMEOUT",
+      "createdAt": "2026-03-05T16:34:54.387Z",
+      "paidAt": ""
+    },
+    "TOPUP_53BBD0B1": {
+      "uid": 7377297098,
+      "amount": 300000,
+      "payContent": "TOPUP TU7098JFPUL7",
+      "status": "DONE",
+      "createdAt": "2026-03-05T16:49:56.225Z",
+      "paidAt": "2026-03-05T16:50:21.837Z"
+    },
+    "TOPUP_57E119E5": {
+      "uid": 7377297098,
+      "amount": 300000,
+      "payContent": "TOPUP TU70989CZFD9",
+      "status": "PENDING",
+      "createdAt": "2026-03-06T13:54:48.081Z",
+      "paidAt": ""
+    },
+    "TOPUP_27633C42": {
+      "uid": 7377297098,
+      "amount": 150000,
+      "payContent": "TOPUP TU70981SHAZW",
+      "status": "PENDING",
+      "createdAt": "2026-03-10T12:04:14.237Z",
+      "paidAt": ""
+    },
+    "TOPUP_BA86E51C": {
+      "uid": 7767439359,
+      "amount": 150000,
+      "payContent": "TOPUP TU9359CUF3RQ",
+      "status": "TIMEOUT",
+      "createdAt": "2026-03-13T14:35:16.212Z",
+      "paidAt": ""
+    },
+    "TOPUP_ABDFA21C": {
+      "uid": 7377297098,
+      "amount": 150000,
+      "payContent": "TOPUP TU7098UFYJ95",
+      "status": "PENDING",
+      "createdAt": "2026-09-06T05:48:42.271Z",
+      "paidAt": ""
+    }
+  },
+  "processedTx": [],
+  "orders": {
+    "OD20260214-EVNETM": {
+      "oid": "OD20260214-EVNETM",
+      "uid": 7377297098,
+      "productId": 2,
+      "productName": "Tool B",
+      "price": 100000,
+      "status": "DONE",
+      "createdAt": "2026-02-14T16:58:14.214Z",
+      "doneAt": "2026-02-14T16:59:47.158Z",
+      "note": "",
+      "adminId": 7377297098
+    },
+    "OD20260215-0YHBOD": {
+      "oid": "OD20260215-0YHBOD",
+      "uid": 7377297098,
+      "productId": 2,
+      "productName": "Tool B",
+      "price": 100000,
+      "status": "DONE",
+      "createdAt": "2026-02-14T17:10:10.712Z",
+      "doneAt": "2026-02-14T17:10:27.473Z",
+      "note": "",
+      "adminId": 7377297098
+    },
+    "OD20260215-PQCQ5Q": {
+      "oid": "OD20260215-PQCQ5Q",
+      "uid": 7377297098,
+      "productId": 2,
+      "productName": "Tool B",
+      "price": 100000,
+      "status": "DONE",
+      "createdAt": "2026-02-14T17:39:03.740Z",
+      "doneAt": "2026-02-14T17:54:41.773Z",
+      "note": "",
+      "adminId": 7377297098
+    },
+    "OD20260215-9ZQQMT": {
+      "oid": "OD20260215-9ZQQMT",
+      "uid": 7377297098,
+      "productId": 2,
+      "productName": "Tool B",
+      "price": 100000,
+      "serial": "asdfasdfasdf",
+      "status": "DONE",
+      "createdAt": "2026-02-14T17:55:08.960Z",
+      "doneAt": "2026-02-14T17:55:23.390Z",
+      "adminId": 7377297098
+    },
+    "OD20260215-7RMFUP": {
+      "oid": "OD20260215-7RMFUP",
+      "uid": 7377297098,
+      "productId": 2,
+      "productName": "Tool B",
+      "price": 100000,
+      "serial": "sddfasdfsd",
+      "status": "DONE",
+      "createdAt": "2026-02-14T17:56:31.662Z",
+      "doneAt": "2026-02-14T17:57:01.208Z",
+      "adminId": 7377297098
+    },
+    "OD20260215-DEWITB": {
+      "oid": "OD20260215-DEWITB",
+      "uid": 7377297098,
+      "productId": 2,
+      "productName": "Tool B",
+      "price": 100000,
+      "serial": "sdfasfsdfas",
+      "status": "DONE",
+      "createdAt": "2026-02-14T18:20:56.378Z",
+      "doneAt": "2026-02-14T18:21:20.474Z",
+      "adminId": 7377297098
+    },
+    "OD20260220-BI4OD1": {
+      "oid": "OD20260220-BI4OD1",
+      "uid": 8000696310,
+      "productId": 1,
+      "productName": "Tool A",
+      "price": 50000,
+      "serial": "48737373",
+      "status": "DONE",
+      "createdAt": "2026-02-20T07:01:09.122Z",
+      "doneAt": "2026-02-20T07:01:22.727Z",
+      "adminId": 7377297098
+    },
+    "OD20260305-DPT5G0": {
+      "oid": "OD20260305-DPT5G0",
+      "uid": 7377297098,
+      "productId": 6,
+      "productName": "🔥Pharaoh Bypass🔥",
+      "price": 0,
+      "serial": "Gdhdhdh",
+      "status": "DONE",
+      "createdAt": "2026-03-05T14:18:56.403Z",
+      "doneAt": "2026-03-05T14:19:05.932Z",
+      "adminId": 7377297098
+    },
+    "OD20260305-8Q41AL": {
+      "oid": "OD20260305-8Q41AL",
+      "uid": 7377297098,
+      "productId": 6,
+      "productName": "🔥Pharaoh Bypass🔥",
+      "price": 0,
+      "serial": "C39X86MFKPG2",
+      "status": "DONE",
+      "createdAt": "2026-03-05T14:33:43.224Z",
+      "doneAt": "2026-03-05T14:48:52.260Z",
+      "adminId": 7377297098
+    },
+    "OD20260305-D4QF0D": {
+      "oid": "OD20260305-D4QF0D",
+      "uid": 8501627556,
+      "productId": 1,
+      "productName": "✨Apple Fix Tool A12+✨ ( HIDDEN )",
+      "price": 270000,
+      "serial": "DNPG6BLC0D80",
+      "status": "DONE",
+      "createdAt": "2026-03-05T16:14:38.156Z",
+      "doneAt": "2026-03-05T16:22:58.573Z",
+      "adminId": 7377297098
+    },
+    "OD20260306-02PJES": {
+      "oid": "OD20260306-02PJES",
+      "uid": 7377297098,
+      "productId": 6,
+      "productName": "🔥Pharaoh Bypass🔥",
+      "price": 0,
+      "serial": "ádfasdfasdfasd",
+      "status": "CANCEL",
+      "createdAt": "2026-03-06T13:53:40.622Z",
+      "doneAt": "2026-03-06T13:53:56.524Z",
+      "adminId": 7377297098
+    },
+    "OD20260306-608UBT": {
+      "oid": "OD20260306-608UBT",
+      "uid": 7377297098,
+      "productId": 1,
+      "productName": "✨Apple Fix Tool A12+✨ ( HIDDEN )",
+      "price": 270000,
+      "serial": "sdfasdfasd",
+      "status": "DONE",
+      "createdAt": "2026-03-06T13:54:16.543Z",
+      "doneAt": "2026-03-06T13:54:19.566Z",
+      "adminId": 7377297098
+    },
+    "OD20260306-DMI3N1": {
+      "oid": "OD20260306-DMI3N1",
+      "uid": 7377297098,
+      "productId": 9,
+      "productName": "ádfasd",
+      "price": 30000,
+      "serial": "sdfasdf",
+      "status": "CANCEL",
+      "createdAt": "2026-03-06T13:56:39.709Z",
+      "doneAt": "2026-03-06T13:56:45.575Z",
+      "adminId": 7377297098
+    },
+    "OD20260310-O9FLFF": {
+      "oid": "OD20260310-O9FLFF",
+      "uid": 7377297098,
+      "productId": 13,
+      "productName": "Fjfh",
+      "price": 500000,
+      "userInput": "Phamtrungdung76549@gmail.com",
+      "serial": "Phamtrungdung76549@gmail.com",
+      "status": "DONE",
+      "createdAt": "2026-03-10T11:47:48.287Z",
+      "doneAt": "2026-03-10T11:48:02.598Z",
+      "adminId": 7377297098
+    },
+    "OD20260310-XM1FEK": {
+      "oid": "OD20260310-XM1FEK",
+      "uid": 7377297098,
+      "productId": 1,
+      "productName": "✨Apple Fix Tool A12+✨ ( HIDDEN )",
+      "price": 270000,
+      "userInput": "sdfasdfasdf",
+      "serial": "sdfasdfasdf",
+      "status": "DONE",
+      "createdAt": "2026-03-10T12:06:56.641Z",
+      "doneAt": "2026-03-10T12:07:03.887Z",
+      "adminId": 7377297098
+    },
+    "OD20260310-4ZSVWK": {
+      "oid": "OD20260310-4ZSVWK",
+      "uid": 7377297098,
+      "productId": 6,
+      "productName": "🔥Pharaoh Bypass🔥",
+      "price": 0,
+      "userInput": "sádfasdfasdf",
+      "serial": "sádfasdfasdf",
+      "status": "DONE",
+      "createdAt": "2026-03-10T12:17:07.917Z",
+      "doneAt": "2026-03-10T12:17:11.551Z",
+      "adminId": 7377297098
+    },
+    "OD20260310-FPBXX6": {
+      "oid": "OD20260310-FPBXX6",
+      "uid": 7377297098,
+      "productId": 15,
+      "productName": "🇻🇳 Chat AI 🚀",
+      "price": 150000,
+      "userInput": "phamtrungdung76549@gmail.com",
+      "serial": "phamtrungdung76549@gmail.com",
+      "status": "DONE",
+      "createdAt": "2026-03-10T13:28:39.311Z",
+      "doneAt": "2026-03-10T13:28:48.069Z",
+      "adminId": 7377297098
+    },
+    "OD20260313-HN5X3H": {
+      "oid": "OD20260313-HN5X3H",
+      "uid": 7767439359,
+      "productId": 15,
+      "productName": "🇻🇳 Chat AI 🚀",
+      "price": 150000,
+      "userInput": "dfasdfsdf",
+      "serial": "dfasdfsdf",
+      "status": "CANCEL",
+      "createdAt": "2026-03-13T14:36:20.460Z",
+      "doneAt": "2026-03-13T14:36:25.113Z",
+      "adminId": 7377297098
+    },
+    "OD20260313-WRRR0Z": {
+      "oid": "OD20260313-WRRR0Z",
+      "uid": 7767439359,
+      "productId": 15,
+      "productName": "🇻🇳 Chat AI 🚀",
+      "price": 150000,
+      "userInput": "đâsd",
+      "serial": "đâsd",
+      "status": "DONE",
+      "createdAt": "2026-03-13T14:36:47.899Z",
+      "doneAt": "2026-03-13T14:36:51.555Z",
+      "adminId": 7377297098
+    },
+    "OD20260313-CKE18B": {
+      "oid": "OD20260313-CKE18B",
+      "uid": 7767439359,
+      "productId": 6,
+      "productName": "🔥Pharaoh Bypass🔥",
+      "price": 0,
+      "userInput": "ádfadf",
+      "serial": "ádfadf",
+      "status": "CANCEL",
+      "createdAt": "2026-03-13T14:37:54.989Z",
+      "doneAt": "2026-03-13T14:38:00.308Z",
+      "adminId": 7377297098
+    },
+    "OD20260313-OD1PTT": {
+      "oid": "OD20260313-OD1PTT",
+      "uid": 7767439359,
+      "productId": 8,
+      "productName": "✨Apple Fix Tool A12+✨ ( BYPASS )",
+      "price": 120000,
+      "userInput": "sdfasdfff",
+      "serial": "sdfasdfff",
+      "status": "DONE",
+      "createdAt": "2026-03-13T14:38:30.677Z",
+      "doneAt": "2026-03-13T14:38:37.714Z",
+      "adminId": 7377297098
+    }
+  }
+}

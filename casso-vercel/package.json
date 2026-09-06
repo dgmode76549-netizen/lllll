@@ -1,0 +1,9 @@
+{
+  "name": "casso-webhook-vercel",
+  "version": "1.0.0",
+  "description": "Casso Webhook Receiver for Supabase on Vercel",
+  "main": "api/index.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  }
+}
