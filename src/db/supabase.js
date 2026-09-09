@@ -379,6 +379,26 @@ async function getUserRentalHistory(telegramId, limit = 10) {
     .slice(0, limit);
 }
 
+async function getRecentRentalHistory(limit = 10) {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (!error && data) return data;
+    } catch (e) {
+      console.error("Supabase getRecentRentalHistory catch:", e.message);
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  return Object.values(fdb.orders || {})
+    .sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt))
+    .slice(0, limit);
+}
+
 // ==========================================
 // 3. QUẢN LÝ GIAO DỊCH NẠP TIỀN (TRANSACTIONS)
 // ==========================================
@@ -582,6 +602,7 @@ module.exports = {
   getOrderByRentalId,
   getUserSuccessfulOrders,
   getUserRentalHistory,
+  getRecentRentalHistory,
   createTransaction,
   completeTransaction,
   getTransaction,

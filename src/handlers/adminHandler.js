@@ -114,10 +114,8 @@ function registerAdminHandler(bot) {
 
   bot.hears("📜 Lịch sử thuê OTP", async (ctx) => {
     if (!requireAdmin(ctx)) return;
-    adminStates.set(ctx.from.id, { step: "WAIT_HISTORY" });
-    return ctx.reply("📩 Hãy gửi <b>Telegram ID</b> của khách cần xem lịch sử thuê OTP (Ví dụ: <code>7377297098</code>):", {
-      parse_mode: "HTML",
-    });
+    adminStates.delete(ctx.from.id);
+    return executeViewAllHistory(ctx);
   });
 
   bot.hears("⬅️ Admin Panel", async (ctx) => {
@@ -186,7 +184,7 @@ function registerAdminHandler(bot) {
   bot.command("history", async (ctx) => {
     if (!requireAdmin(ctx)) return;
     const parts = ctx.message.text.split(" ").filter(Boolean);
-    if (parts.length < 2) return ctx.reply("Cú pháp: /history [Telegram_ID]");
+    if (parts.length < 2) return executeViewAllHistory(ctx);
     return executeViewHistory(ctx, parts[1]);
   });
 
@@ -225,11 +223,6 @@ function registerAdminHandler(bot) {
     if (st.step === "WAIT_VIEW") {
       adminStates.delete(ctx.from.id);
       return executeViewUser(ctx, parts[0]);
-    }
-
-    if (st.step === "WAIT_HISTORY") {
-      adminStates.delete(ctx.from.id);
-      return executeViewHistory(ctx, parts[0]);
     }
 
     return next();
@@ -370,6 +363,66 @@ async function executeViewHistory(ctx, targetUid) {
     `<pre>${escapeHtml(table)}</pre>\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `✅ Hoàn thành  ⏳ Đang chờ  💸 Hoàn tiền  ❌ Đã hủy`;
+
+  return ctx.reply(message, { parse_mode: "HTML", ...adminMenu() });
+}
+
+async function executeViewAllHistory(ctx) {
+  const orders = await db.getRecentRentalHistory(10);
+  if (!orders?.length) {
+    return ctx.reply(
+      `📜 <b>LỊCH SỬ THUÊ OTP TOÀN HỆ THỐNG</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `ℹ️ Chưa có người dùng nào thuê OTP.`,
+      { parse_mode: "HTML", ...adminMenu() }
+    );
+  }
+
+  const statusIcons = {
+    PENDING: "⏳",
+    COMPLETED: "✅",
+    DONE: "✅",
+    REFUNDED: "💸",
+    CANCELLED: "❌",
+    EXPIRED: "⌛",
+  };
+  const completedCount = orders.filter((order) => ["COMPLETED", "DONE"].includes(String(order.status).toUpperCase())).length;
+  const pendingCount = orders.filter((order) => String(order.status).toUpperCase() === "PENDING").length;
+  const totalAmount = orders.reduce((total, order) => total + (Number(order.amount) || Number(order.price) || 0), 0);
+
+  const tableRows = orders.map((order, index) => {
+    const status = String(order.status || "UNKNOWN").toUpperCase();
+    const amount = Number(order.amount) || Number(order.price) || 0;
+    const userId = order.telegram_id ?? order.uid ?? "—";
+    const phone = String(order.phone_number || order.phone || "—").replace(/\s+/g, "");
+    const otp = order.otp_code || order.otp || order.code || "—";
+    const createdAt = order.created_at || order.createdAt;
+    return [
+      tableCell(String(index + 1).padStart(2, "0"), 2),
+      tableCell(String(userId), 10),
+      tableCell(formatTableDate(createdAt), 11),
+      tableCell(statusIcons[status] || "⚪", 2),
+      tableCell(phone, 11),
+      tableCell(otp, 6),
+      tableCell(`${formatMoney(amount)}đ`, 10, "right"),
+    ].join("  ");
+  }).join("\n");
+
+  const table =
+    `ST  UID         THỜI GIAN    TT  SỐ ĐIỆN THOẠI  OTP       SỐ TIỀN\n` +
+    `──────────────────────────────────────────────────────────────\n` +
+    tableRows;
+
+  const message =
+    `🌐 <b>LỊCH SỬ THUÊ OTP TOÀN HỆ THỐNG</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📌 10 đơn thuê mới nhất của tất cả người dùng\n` +
+    `📊 <b>Tổng quan:</b> ${orders.length} đơn  •  ✅ ${completedCount}  •  ⏳ ${pendingCount}\n` +
+    `💰 <b>Giá trị 10 đơn:</b> ${formatMoney(totalAmount)}đ\n\n` +
+    `<pre>${escapeHtml(table)}</pre>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `✅ Hoàn thành  ⏳ Đang chờ  💸 Hoàn tiền  ❌ Đã hủy\n` +
+    `💡 Dùng <code>/history UID</code> để xem riêng một người dùng.`;
 
   return ctx.reply(message, { parse_mode: "HTML", ...adminMenu() });
 }
