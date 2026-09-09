@@ -2,7 +2,7 @@ const otpService = require("../services/otpService");
 const rentalManager = require("../services/rentalManager");
 const db = require("../db/supabase");
 const config = require("../config");
-const { otpRentalInlineKeyboard, insufficientBalanceKeyboard, topupMenu } = require("../keyboards/menus");
+const { formatCountdown, otpRentalInlineKeyboard, insufficientBalanceKeyboard, topupMenu } = require("../keyboards/menus");
 const { Markup } = require("telegraf");
 
 function formatMoney(n) {
@@ -86,7 +86,6 @@ function registerOtpHandler(bot) {
     // 5. Thuê thành công, tạo đơn hàng
     const rental = rentRes.rental;
     const orderId = generateOrderId();
-    const waitMinutes = Math.round(config.OTP_TIMEOUT_SECONDS / 60);
     const expiresAt = new Date(Date.now() + config.OTP_TIMEOUT_SECONDS * 1000);
 
     await db.createOrder({
@@ -110,7 +109,7 @@ function registerOtpHandler(bot) {
       `📞 <b>Số điện thoại:</b> <code>${rental.phone_number}</code> <i>(Chạm để sao chép)</i>\n` +
       `📦 <b>Dịch vụ:</b> Shopee\n` +
       `💵 <b>Giá thuê:</b> ${formatMoney(price)}đ\n` +
-      `⏳ <b>Thời gian chờ mã:</b> ${config.OTP_TIMEOUT_SECONDS}s (Đếm ngược)\n` +
+      `⏱️ <b>Thời gian còn lại:</b> <code>${formatCountdown(config.OTP_TIMEOUT_SECONDS)}</code>\n` +
       `🧾 <b>Mã đơn:</b> <code>${orderId}</code>\n` +
       `━━━━━━━━━━━━━━━━━━━━`,
       {

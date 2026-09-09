@@ -2,6 +2,7 @@ const { Telegraf } = require("telegraf");
 const express = require("express");
 const config = require("./config");
 const db = require("./db/supabase");
+const createAntiSpamMiddleware = require("./middleware/antiSpam");
 
 // Handlers
 const registerStartHandler = require("./handlers/startHandler");
@@ -19,6 +20,16 @@ if (!config.BOT_TOKEN) {
 }
 
 const bot = new Telegraf(config.BOT_TOKEN);
+
+// Chặn người dùng gửi quá nhiều update liên tiếp trước khi chạy handler.
+bot.use(
+  createAntiSpamMiddleware({
+    isExempt: (userId) => config.ADMIN_IDS.includes(Number(userId)),
+    windowMs: config.SPAM_WINDOW_SECONDS * 1000,
+    maxRequests: config.SPAM_MAX_REQUESTS,
+    blockMs: config.SPAM_BLOCK_SECONDS * 1000,
+  })
+);
 
 // Đăng ký toàn bộ handlers
 registerStartHandler(bot);

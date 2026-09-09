@@ -1,6 +1,7 @@
 const otpService = require("./otpService");
 const db = require("../db/supabase");
 const config = require("../config");
+const { otpCountdownButtonLabel } = require("../keyboards/menus");
 
 // Lưu trữ các phiên polling đang hoạt động: orderId -> { interval, rentalId, telegramId, startTime, expiresAt, stopped }
 const activePollers = new Map();
@@ -52,7 +53,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
     if (meta?.chatId && meta?.messageId && remainingSeconds > 0) {
       try {
         await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
-          inline_keyboard: [[{ text: `🔄 Lấy mã OTP (${remainingSeconds}s)`, callback_data: `CHECK_OTP:${orderId}` }]],
+          inline_keyboard: [[{ text: otpCountdownButtonLabel(remainingSeconds), callback_data: `CHECK_OTP:${orderId}` }]],
         });
       } catch {}
     }

@@ -39,10 +39,22 @@ function adminWalletMenu() {
   ]).resize().persistent();
 }
 
+function formatCountdown(secondsLeft = 0) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(secondsLeft) || 0));
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function otpCountdownButtonLabel(secondsLeft = 240) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(secondsLeft) || 0));
+  const statusIcon = totalSeconds <= 30 ? "🔴" : totalSeconds <= 60 ? "🟡" : "🟢";
+  return `${statusIcon} CÒN ${formatCountdown(totalSeconds)} • LẤY MÃ OTP`;
+}
+
 function otpRentalInlineKeyboard(orderId, secondsLeft = 240) {
-  const timeLabel = secondsLeft > 0 ? ` (${secondsLeft}s)` : "";
   return Markup.inlineKeyboard([
-    [Markup.button.callback(`🔄 Lấy mã OTP${timeLabel}`, `CHECK_OTP:${orderId}`)],
+    [Markup.button.callback(otpCountdownButtonLabel(secondsLeft), `CHECK_OTP:${orderId}`)],
   ]);
 }
 
@@ -58,6 +70,8 @@ module.exports = {
   topupMenu,
   adminMenu,
   adminWalletMenu,
+  formatCountdown,
+  otpCountdownButtonLabel,
   otpRentalInlineKeyboard,
   insufficientBalanceKeyboard,
 };

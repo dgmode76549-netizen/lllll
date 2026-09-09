@@ -38,6 +38,11 @@ const config = {
   OTP_PRICE_VND: Number(process.env.OTP_PRICE_VND) || 5000,
   OTP_TIMEOUT_SECONDS: Number(process.env.OTP_TIMEOUT_SECONDS) || 240,
 
+  // Chống spam Telegram
+  SPAM_WINDOW_SECONDS: Number(process.env.SPAM_WINDOW_SECONDS) || 10,
+  SPAM_MAX_REQUESTS: Number(process.env.SPAM_MAX_REQUESTS) || 8,
+  SPAM_BLOCK_SECONDS: Number(process.env.SPAM_BLOCK_SECONDS) || 30,
+
   // Cấu hình Casso & VietQR
   CASSO_API_KEY: process.env.CASSO_API_KEY || "",
   CASSO_WEBHOOK_SECRET: process.env.CASSO_WEBHOOK_SECRET || "",
