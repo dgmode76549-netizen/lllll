@@ -28,6 +28,7 @@ function topupMenu() {
 function adminMenu() {
   return Markup.keyboard([
     ["📊 Số dư Provider & Thống kê", "💰 Quản lý ví khách"],
+    ["📜 Lịch sử thuê OTP"],
     ["⬅️ Về menu"],
   ]).resize().persistent();
 }

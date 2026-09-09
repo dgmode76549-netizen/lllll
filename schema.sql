@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 
 -- TẠO INDEX ĐỂ TỐI ƯU TRUY VẤN
 CREATE INDEX IF NOT EXISTS idx_orders_user ON public.orders(telegram_id);
+CREATE INDEX IF NOT EXISTS idx_orders_user_created_at ON public.orders(telegram_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_rental_id ON public.orders(rental_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON public.transactions(telegram_id);
@@ -100,5 +101,4 @@ GRANT ALL ON TABLE public.orders TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.transactions TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.casso_transactions TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.change_user_balance TO anon, authenticated, service_role;
-
 
