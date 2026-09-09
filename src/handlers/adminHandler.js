@@ -65,6 +65,11 @@ function registerAdminHandler(bot) {
       `• Tổng số khách hàng: <b>${stats.totalUsers}</b> người\n` +
       `• Tổng số đơn đã tạo: <b>${stats.totalOrders}</b> đơn\n` +
       `• Đơn hoàn thành (có OTP): <b>${stats.completedOrders}</b> đơn\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💵 <b>DOANH THU & NẠP TIỀN:</b>\n` +
+      `• Doanh thu hôm nay: <b>${formatMoney(stats.todayRevenue)}đ</b>\n` +
+      `• Đơn hoàn thành hôm nay: <b>${stats.todayOrders}</b> đơn\n` +
+      `• Tổng tiền người dùng đã nạp: <b>${formatMoney(stats.totalDeposited)}đ</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━`;
 
     return ctx.reply(msg, { parse_mode: "HTML", ...adminMenu() });

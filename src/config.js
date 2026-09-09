@@ -14,9 +14,8 @@ function loadSettings() {
   }
   return {
     sosText: "🆘 Hỗ trợ: Nhắn admin để được hỗ trợ.",
-    supportUsername: "@phamdung200910",
-    supportLink: "",
-    supportPhone: "+84774391888",
+    supportUsername: "@chuataydau369",
+    supportLink: "https://t.me/chuataydau369",
   };
 }
 

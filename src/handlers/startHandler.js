@@ -79,8 +79,7 @@ function registerStartHandler(bot) {
       `🆘 <b>TRUNG TÂM HỖ TRỢ</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `${s.sosText || "Nếu gặp bất kỳ vấn đề gì về nạp tiền hoặc nhận mã, vui lòng liên hệ Admin:"}\n\n` +
-      `👤 <b>Telegram Admin:</b> ${s.supportUsername || "@phamdung200910"}\n` +
-      `📞 <b>Hotline/Zalo:</b> <code>${s.supportPhone || "+84774391888"}</code>\n` +
+      `👤 <b>Telegram Admin:</b> ${s.supportUsername || "@chuataydau369"}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7!`;
 

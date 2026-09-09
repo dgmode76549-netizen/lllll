@@ -460,20 +460,62 @@ async function getTransaction(txId) {
 // 4. ADMIN HELPERS
 // ==========================================
 
+function getVietnamTodayBounds() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const dateParts = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const start = new Date(`${dateParts.year}-${dateParts.month}-${dateParts.day}T00:00:00+07:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function sumAmounts(rows, field = "amount") {
+  return (rows || []).reduce((total, row) => total + (Number(row?.[field]) || 0), 0);
+}
+
+function getOrderAmount(order) {
+  return Number(order?.amount) || Number(order?.price) || 0;
+}
+
 async function getAdminStats() {
+  const today = getVietnamTodayBounds();
+
   if (supabase) {
     try {
-      const { count: totalUsers } = await supabase.from("users").select("*", { count: "exact", head: true });
-      const { count: totalOrders } = await supabase.from("orders").select("*", { count: "exact", head: true });
-      const { count: completedOrders } = await supabase
-        .from("orders")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "COMPLETED");
+      const [usersResult, ordersResult, completedOrdersResult, transactionsResult, todayOrdersResult] = await Promise.all([
+        supabase.from("users").select("*", { count: "exact", head: true }),
+        supabase.from("orders").select("*", { count: "exact", head: true }),
+        supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "COMPLETED"),
+        supabase.from("transactions").select("amount").eq("status", "DONE"),
+        supabase
+          .from("orders")
+          .select("amount")
+          .eq("status", "COMPLETED")
+          .gte("updated_at", today.start)
+          .lt("updated_at", today.end),
+      ]);
+
+      if (usersResult.error || ordersResult.error || completedOrdersResult.error || transactionsResult.error || todayOrdersResult.error) {
+        throw new Error(
+          usersResult.error?.message ||
+            ordersResult.error?.message ||
+            completedOrdersResult.error?.message ||
+            transactionsResult.error?.message ||
+            todayOrdersResult.error?.message
+        );
+      }
 
       return {
-        totalUsers: totalUsers || 0,
-        totalOrders: totalOrders || 0,
-        completedOrders: completedOrders || 0,
+        totalUsers: usersResult.count || 0,
+        totalOrders: ordersResult.count || 0,
+        completedOrders: completedOrdersResult.count || 0,
+        totalDeposited: sumAmounts(transactionsResult.data),
+        todayRevenue: sumAmounts(todayOrdersResult.data),
+        todayOrders: todayOrdersResult.data?.length || 0,
       };
     } catch (e) {
       console.error("Supabase getAdminStats catch:", e.message);
@@ -483,11 +525,24 @@ async function getAdminStats() {
   const fdb = loadFallbackDb();
   const users = Object.keys(fdb.users || {}).length;
   const orders = Object.values(fdb.orders || {});
-  const completed = orders.filter((o) => o.status === "COMPLETED").length;
+  const completed = orders.filter((o) => ["COMPLETED", "DONE"].includes(String(o.status).toUpperCase()));
+  const transactions = Object.values(fdb.transactions || {}).filter((tx) => ["DONE", "COMPLETED"].includes(String(tx.status).toUpperCase()));
+  const todayStart = new Date(today.start).getTime();
+  const todayEnd = new Date(today.end).getTime();
+  const todayOrders = completed.filter((order) => {
+    const completedAt = order.updated_at || order.doneAt || order.created_at || order.createdAt;
+    const timestamp = new Date(completedAt).getTime();
+    return timestamp >= todayStart && timestamp < todayEnd;
+  });
+  const userDeposits = Object.values(fdb.users || {}).reduce((total, user) => total + (Number(user.total_deposited) || 0), 0);
+
   return {
     totalUsers: users,
     totalOrders: orders.length,
-    completedOrders: completed,
+    completedOrders: completed.length,
+    totalDeposited: transactions.length ? sumAmounts(transactions) : userDeposits,
+    todayRevenue: todayOrders.reduce((total, order) => total + getOrderAmount(order), 0),
+    todayOrders: todayOrders.length,
   };
 }
 
