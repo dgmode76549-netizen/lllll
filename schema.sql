@@ -24,9 +24,15 @@ CREATE TABLE IF NOT EXISTS public.orders (
     amount NUMERIC NOT NULL DEFAULT 5000,
     status TEXT NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'COMPLETED', 'REFUNDED', 'CANCELLED'
     expires_at TIMESTAMPTZ,
+    server_id TEXT,
+    product_id TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Bổ sung metadata cho các đơn đã tạo từ schema cũ.
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS server_id TEXT;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS product_id TEXT;
 
 -- 3. BẢNG TRANSACTIONS (Lưu lịch sử nạp tiền qua ngân hàng / VietQR)
 CREATE TABLE IF NOT EXISTS public.transactions (
@@ -101,4 +107,3 @@ GRANT ALL ON TABLE public.orders TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.transactions TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.casso_transactions TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.change_user_balance TO anon, authenticated, service_role;
-

@@ -34,8 +34,10 @@ const config = {
   // Nhà cung cấp OTP (shopitool)
   OTP_BASE_URL: (process.env.OTP_BASE_URL || "https://shopitool.dpdns.org").replace(/\/+$/, ""),
   OTP_API_KEY: process.env.OTP_API_KEY || "",
-  OTP_PRODUCT_ID: process.env.OTP_PRODUCT_ID || "1",
-  OTP_PRICE_VND: Number(process.env.OTP_PRICE_VND) || 5000,
+  // Server 2 dùng mã sản phẩm dạng s2:<country>:<service>.
+  OTP_SERVER_ID: String(process.env.OTP_SERVER_ID || "2"),
+  OTP_PRODUCT_ID: process.env.OTP_PRODUCT_ID || "s2:10:ka",
+  OTP_PRICE_VND: Number(process.env.OTP_PRICE_VND) || 4000,
   OTP_TIMEOUT_SECONDS: Number(process.env.OTP_TIMEOUT_SECONDS) || 240,
 
   // Chống spam Telegram

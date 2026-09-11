@@ -119,6 +119,30 @@ async function getOrCreateUser(telegramId, meta = {}) {
   return fdb.users[sId];
 }
 
+async function getAllUserIds() {
+  if (supabase) {
+    try {
+      const pageSize = 1000;
+      const users = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("telegram_id")
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        users.push(...(data || []).map((user) => Number(user.telegram_id)).filter(Number.isFinite));
+        if (!data || data.length < pageSize) break;
+      }
+      return [...new Set(users)];
+    } catch (e) {
+      console.error("Supabase getAllUserIds catch:", e.message);
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  return Object.keys(fdb.users || {}).map(Number).filter(Number.isFinite);
+}
+
 async function getUser(telegramId) {
   const tgId = Number(telegramId);
   if (supabase) {
@@ -250,11 +274,24 @@ async function createOrder(orderData) {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+  const optionalFields = {
+    server_id: orderData.serverId ? String(orderData.serverId) : null,
+    product_id: orderData.productId ? String(orderData.productId) : null,
+  };
 
   if (supabase) {
     try {
-      const { data, error } = await supabase.from("orders").insert(record).select().single();
+      const { data, error } = await supabase
+        .from("orders")
+        .insert({ ...record, ...optionalFields })
+        .select()
+        .single();
       if (!error && data) return data;
+      // Cho phép chạy ngay cả khi database cũ chưa thêm hai cột metadata.
+      if (error && (error.code === "42703" || error.code === "PGRST204")) {
+        const retry = await supabase.from("orders").insert(record).select().single();
+        if (!retry.error && retry.data) return retry.data;
+      }
       console.error("Supabase createOrder error:", error);
     } catch (e) {
       console.error("Supabase createOrder catch:", e.message);
@@ -263,7 +300,7 @@ async function createOrder(orderData) {
 
   const fdb = loadFallbackDb();
   if (!fdb.orders) fdb.orders = {};
-  fdb.orders[record.id] = record;
+  fdb.orders[record.id] = { ...record, ...optionalFields };
   saveFallbackDb(fdb);
   return record;
 }
@@ -593,6 +630,7 @@ module.exports = {
   supabase,
   isSupabaseConfigured,
   getOrCreateUser,
+  getAllUserIds,
   getUser,
   changeUserBalance,
   setUserBalance,

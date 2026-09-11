@@ -27,7 +27,12 @@ function registerOtpHandler(bot) {
       name: [from.first_name, from.last_name].filter(Boolean).join(" ").trim(),
     });
 
-    const price = config.OTP_PRICE_VND;
+    const serverId = String(config.OTP_SERVER_ID || "2");
+    const productId = String(config.OTP_PRODUCT_ID);
+    const productsRes = await otpService.getProviderProducts(serverId);
+    const configuredProduct = productsRes?.products?.find((product) => String(product.id) === productId);
+    const price = Number(configuredProduct?.price_vnd) || config.OTP_PRICE_VND;
+    const serviceName = configuredProduct?.name || "Shopee";
     const currentBalance = Number(user.balance) || 0;
 
     // 1. Kiểm tra số dư
@@ -36,7 +41,7 @@ function registerOtpHandler(bot) {
         `⚠️ <b>SỐ DƯ CỦA BẠN KHÔNG ĐỦ!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `💰 <b>Số dư hiện có:</b> ${formatMoney(currentBalance)}đ\n` +
-        `💵 <b>Giá thuê OTP Shopee:</b> ${formatMoney(price)}đ\n` +
+        `💵 <b>Giá thuê OTP ${serviceName}:</b> ${formatMoney(price)}đ\n` +
         `🔻 <b>Còn thiếu:</b> ${formatMoney(price - currentBalance)}đ\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `Vui lòng nạp thêm tiền vào ví để tiếp tục sử dụng dịch vụ.`,
@@ -62,7 +67,7 @@ function registerOtpHandler(bot) {
     }
 
     // 4. Gọi API nhà cung cấp SIM
-    const rentRes = await otpService.rentOtp(config.OTP_PRODUCT_ID);
+    const rentRes = await otpService.rentOtp({ serverId, productId });
 
     if (!rentRes || !rentRes.success || !rentRes.rental || !rentRes.rental.phone_number) {
       // Hoàn tiền ngay lập tức nếu API lỗi hoặc hết số
@@ -71,7 +76,7 @@ function registerOtpHandler(bot) {
         await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
       } catch {}
 
-      const errorDetail = rentRes?.error || rentRes?.message || "Kho số Shopee đang tạm hết hoặc bảo trì";
+      const errorDetail = rentRes?.error || rentRes?.message || `Kho số ${serviceName} đang tạm hết hoặc bảo trì`;
       return ctx.reply(
         `❌ <b>KHÔNG THỂ LẤY SỐ ĐIỆN THOẠI!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
@@ -86,7 +91,10 @@ function registerOtpHandler(bot) {
     // 5. Thuê thành công, tạo đơn hàng
     const rental = rentRes.rental;
     const orderId = generateOrderId();
-    const expiresAt = new Date(Date.now() + config.OTP_TIMEOUT_SECONDS * 1000);
+    const providerExpiresAt = new Date(rental.expires_at || "");
+    const expiresAt = Number.isNaN(providerExpiresAt.getTime()) || providerExpiresAt.getTime() <= Date.now()
+      ? new Date(Date.now() + config.OTP_TIMEOUT_SECONDS * 1000)
+      : providerExpiresAt;
 
     await db.createOrder({
       id: orderId,
@@ -96,6 +104,8 @@ function registerOtpHandler(bot) {
       amount: price,
       status: "PENDING",
       expiresAt: expiresAt.toISOString(),
+      serverId,
+      productId,
     });
 
     try {
@@ -104,17 +114,17 @@ function registerOtpHandler(bot) {
 
     // Gửi thông tin SĐT cho khách
     const sentMsg = await ctx.reply(
-      `📱 <b>THUÊ SỐ SHOPEE THÀNH CÔNG!</b>\n` +
+      `📱 <b>THUÊ SỐ ${serviceName.toUpperCase()} THÀNH CÔNG!</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `📞 <b>Số điện thoại:</b> <code>${rental.phone_number}</code> <i>(Chạm để sao chép)</i>\n` +
-      `📦 <b>Dịch vụ:</b> Shopee\n` +
+      `📦 <b>Dịch vụ:</b> ${serviceName}\n` +
       `💵 <b>Giá thuê:</b> ${formatMoney(price)}đ\n` +
       `⏱️ <b>Thời gian còn lại:</b> <code>${formatCountdown(config.OTP_TIMEOUT_SECONDS)}</code>\n` +
       `🧾 <b>Mã đơn:</b> <code>${orderId}</code>\n` +
       `━━━━━━━━━━━━━━━━━━━━`,
       {
         parse_mode: "HTML",
-        ...otpRentalInlineKeyboard(orderId, config.OTP_TIMEOUT_SECONDS),
+        ...otpRentalInlineKeyboard(orderId, config.OTP_TIMEOUT_SECONDS, serverId === "2"),
       }
     );
 
@@ -122,6 +132,7 @@ function registerOtpHandler(bot) {
     rentalManager.startRentalPolling(bot, orderId, rental.id, from.id, expiresAt.getTime(), {
       chatId: ctx.chat.id,
       messageId: sentMsg.message_id,
+      serverId,
     });
   });
 
@@ -129,7 +140,7 @@ function registerOtpHandler(bot) {
   bot.action(/^CHECK_OTP:(.+)$/, async (ctx) => {
     const orderId = ctx.match[1];
     try {
-      const res = await rentalManager.checkOtpManually(bot, orderId);
+      const res = await rentalManager.checkOtpManually(bot, orderId, ctx.from.id);
       if (res.hasOtp) {
         await ctx.answerCbQuery("🎉 Đã nhận được mã OTP!");
         try {
@@ -147,11 +158,22 @@ function registerOtpHandler(bot) {
     }
   });
 
-  // Xử lý nếu bấm nút Hủy từ tin nhắn cũ trước đây
-  bot.action(/^CANCEL_OTP:/, async (ctx) => {
-    return ctx.answerCbQuery("⚠️ Không thể hủy số. Vui lòng đợi hết 4 phút hệ thống sẽ tự động hoàn 5.000đ nếu không có mã!", {
-      show_alert: true,
-    });
+  // Hủy lượt thuê Server 2 và chỉ hoàn tiền sau khi nhà cung cấp xác nhận.
+  bot.action(/^CANCEL_OTP:(.+)$/, async (ctx) => {
+    const orderId = ctx.match[1];
+    try {
+      const result = await rentalManager.cancelPendingRental(bot, orderId, ctx.from.id);
+      await ctx.answerCbQuery(result.message, { show_alert: !result.success });
+      if (result.success) {
+        try {
+          await ctx.editMessageReplyMarkup(
+            Markup.inlineKeyboard([[Markup.button.callback("💸 ĐÃ HỦY — ĐÃ HOÀN TIỀN", "NOP")]]).reply_markup
+          );
+        } catch {}
+      }
+    } catch (e) {
+      await ctx.answerCbQuery("❌ Không thể hủy: " + e.message, { show_alert: true });
+    }
   });
 
   // Phím tắt Nạp tiền nhanh từ thông báo số dư không đủ

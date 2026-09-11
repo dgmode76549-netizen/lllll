@@ -66,8 +66,9 @@ ADMIN_IDS=7377297098
 # Cấu hình OTP (shopitool)
 OTP_BASE_URL=https://shopitool.dpdns.org
 OTP_API_KEY=sk_live_...
-OTP_PRODUCT_ID=otp:11
-OTP_PRICE_VND=5000
+OTP_SERVER_ID=2
+OTP_PRODUCT_ID=s2:10:ka
+OTP_PRICE_VND=4000
 OTP_TIMEOUT_SECONDS=240
 
 # Cấu hình Supabase

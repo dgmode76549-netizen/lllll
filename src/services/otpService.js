@@ -41,9 +41,10 @@ async function getProviderBalance() {
  * Lấy danh sách gói & giá từ nhà cung cấp
  * GET /api/otp/products
  */
-async function getProviderProducts() {
+async function getProviderProducts(serverId = "") {
   try {
-    const url = `${config.OTP_BASE_URL}/api/otp/products`;
+    const query = serverId ? `?server=${encodeURIComponent(serverId)}` : "";
+    const url = `${config.OTP_BASE_URL}/api/otp/products${query}`;
     const res = await fetchFn(url, {
       method: "GET",
       headers: getHeaders(),
@@ -59,15 +60,21 @@ async function getProviderProducts() {
 /**
  * Thuê số nhận OTP Shopee
  * POST /api/otp/rent
- * Body: { "product_id": "1" }
+ * Server 1: { "product_id": "otp:11" }
+ * Server 2: { "server": "2", "product_id": "s2:10:ka" }
  */
-async function rentOtp(productId = config.OTP_PRODUCT_ID) {
+async function rentOtp(options = {}) {
   try {
+    if (typeof options === "string") options = { productId: options };
+    const serverId = String(options.serverId || config.OTP_SERVER_ID || "1");
+    const productId = options.productId || config.OTP_PRODUCT_ID;
     const url = `${config.OTP_BASE_URL}/api/otp/rent`;
+    const body = { product_id: String(productId) };
+    if (serverId === "2") body.server = "2";
     const res = await fetchFn(url, {
       method: "POST",
       headers: getHeaders(),
-      body: JSON.stringify({ product_id: String(productId) }),
+      body: JSON.stringify(body),
     });
 
     const data = await res.json();
@@ -90,6 +97,28 @@ async function rentOtp(productId = config.OTP_PRODUCT_ID) {
   } catch (error) {
     console.error("❌ Lỗi gọi rentOtp:", error.message);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Hủy lượt thuê Server 2. Nhà cung cấp yêu cầu form-urlencoded.
+ * POST /api/otp/rentals/cancel
+ */
+async function cancelRental(rentalId) {
+  try {
+    const url = `${config.OTP_BASE_URL}/api/otp/rentals/cancel`;
+    const headers = getHeaders();
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+    const res = await fetchFn(url, {
+      method: "POST",
+      headers,
+      body: new URLSearchParams({ rental_id: String(rentalId) }).toString(),
+    });
+    const data = await res.json();
+    return { ...data, httpStatus: res.status };
+  } catch (error) {
+    console.error(`❌ Lỗi gọi cancelRental (${rentalId}):`, error.message);
+    return { success: false, canceled: false, error: error.message };
   }
 }
 
@@ -117,5 +146,6 @@ module.exports = {
   getProviderBalance,
   getProviderProducts,
   rentOtp,
+  cancelRental,
   getRentalStatus,
 };

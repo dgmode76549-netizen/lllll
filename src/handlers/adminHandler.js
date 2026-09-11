@@ -118,6 +118,15 @@ function registerAdminHandler(bot) {
     return executeViewAllHistory(ctx);
   });
 
+  bot.hears("📢 Thông báo toàn bộ người dùng", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    adminStates.set(ctx.from.id, { step: "WAIT_BROADCAST" });
+    return ctx.reply(
+      "📢 <b>THÔNG BÁO TOÀN BỘ NGƯỜI DÙNG</b>\n\nHãy gửi nội dung cần thông báo. Tin nhắn sẽ được gửi đến tất cả người dùng đã từng sử dụng bot.",
+      { parse_mode: "HTML" }
+    );
+  });
+
   bot.hears("⬅️ Admin Panel", async (ctx) => {
     if (!requireAdmin(ctx)) return;
     adminStates.delete(ctx.from.id);
@@ -225,8 +234,53 @@ function registerAdminHandler(bot) {
       return executeViewUser(ctx, parts[0]);
     }
 
+    if (st.step === "WAIT_BROADCAST") {
+      adminStates.delete(ctx.from.id);
+      return executeBroadcast(ctx, bot, text);
+    }
+
     return next();
   });
+}
+
+async function executeBroadcast(ctx, bot, text) {
+  const message = String(text || "").trim();
+  if (!message) return ctx.reply("❌ Nội dung thông báo không được để trống.");
+
+  const userIds = await db.getAllUserIds();
+  if (!userIds.length) return ctx.reply("ℹ️ Chưa có người dùng nào để gửi thông báo.");
+
+  const broadcastText = `📢 THÔNG BÁO TỪ QUẢN TRỊ VIÊN\n\n${message}`.slice(0, 4096);
+  const progress = await ctx.reply(`⏳ Đang gửi thông báo đến ${userIds.length} người dùng...`);
+  let sent = 0;
+  let failed = 0;
+
+  for (const userId of userIds) {
+    try {
+      await bot.telegram.sendMessage(userId, broadcastText);
+      sent += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn(`[Admin] Không gửi được thông báo đến ${userId}:`, error.message);
+    }
+    // Giữ tốc độ an toàn với giới hạn gửi tin của Telegram.
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+
+  try {
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      progress.message_id,
+      undefined,
+      `✅ <b>ĐÃ GỬI THÔNG BÁO</b>\n\n` +
+        `👥 Tổng số người dùng: <b>${userIds.length}</b>\n` +
+        `✅ Gửi thành công: <b>${sent}</b>\n` +
+        `⚠️ Không gửi được: <b>${failed}</b>`,
+      { parse_mode: "HTML" }
+    );
+  } catch {
+    await ctx.reply(`✅ Đã gửi ${sent}/${userIds.length} thông báo.`);
+  }
 }
 
 async function executeBalanceChange(ctx, bot, targetUid, amount, type = "add") {

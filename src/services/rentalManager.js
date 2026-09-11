@@ -37,7 +37,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
       activePollers.delete(orderId);
       if (meta?.chatId && meta?.messageId) {
         try {
-          await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
+        await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
             inline_keyboard: [[{ text: "⌛ HẾT HẠN (ĐÃ HOÀN TIỀN)", callback_data: "NOP" }]],
           });
         } catch {}
@@ -53,7 +53,12 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
     if (meta?.chatId && meta?.messageId && remainingSeconds > 0) {
       try {
         await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
-          inline_keyboard: [[{ text: otpCountdownButtonLabel(remainingSeconds), callback_data: `CHECK_OTP:${orderId}` }]],
+          inline_keyboard: [
+            [{ text: otpCountdownButtonLabel(remainingSeconds), callback_data: `CHECK_OTP:${orderId}` }],
+            ...(session.serverId === "2"
+              ? [[{ text: "🛑 Hủy thuê số & hoàn tiền", callback_data: `CANCEL_OTP:${orderId}` }]]
+              : []),
+          ],
         });
       } catch {}
     }
@@ -115,6 +120,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
     startTime,
     expiresAtMs,
     meta,
+    serverId: String(meta.serverId || config.OTP_SERVER_ID || "1"),
     stopped: false,
   });
 }
@@ -135,9 +141,12 @@ function stopRentalPolling(orderId) {
 /**
  * Xử lý khi khách bấm Lấy mã thủ công
  */
-async function checkOtpManually(bot, orderId) {
+async function checkOtpManually(bot, orderId, requesterId = null) {
   const order = await db.getOrder(orderId);
   if (!order) return { success: false, message: "Không tìm thấy đơn hàng" };
+  if (requesterId !== null && Number(order.telegram_id) !== Number(requesterId)) {
+    return { success: false, message: "Bạn không có quyền xem đơn thuê này" };
+  }
 
   if (order.status === "COMPLETED" && order.otp_code) {
     return { success: true, hasOtp: true, otpCode: order.otp_code, phoneNumber: order.phone_number };
@@ -176,8 +185,36 @@ async function checkOtpManually(bot, orderId) {
   return { success: true, hasOtp: false, message: "Hệ thống vẫn đang chờ mã từ Shopee..." };
 }
 
+async function cancelPendingRental(bot, orderId, requesterId) {
+  const order = await db.getOrder(orderId);
+  if (!order) return { success: false, message: "Không tìm thấy đơn thuê" };
+  if (Number(order.telegram_id) !== Number(requesterId)) {
+    return { success: false, message: "Bạn không có quyền hủy đơn thuê này" };
+  }
+  if (order.status !== "PENDING") {
+    return { success: false, message: `Đơn đã kết thúc với trạng thái ${order.status}` };
+  }
+
+  const serverId = String(order.server_id || config.OTP_SERVER_ID || "1");
+  if (serverId !== "2") {
+    return { success: false, message: "Chỉ hỗ trợ hủy số cho Server 2" };
+  }
+
+  const result = await otpService.cancelRental(order.rental_id);
+  if (!result?.success || !result?.canceled) {
+    return {
+      success: false,
+      message: result?.error || result?.rental?.error || result?.message || "Nhà cung cấp chưa cho phép hủy số (mã 409)",
+    };
+  }
+
+  stopRentalPolling(orderId);
+  await handleTimeoutOrCancel(bot, orderId, "Bạn đã hủy số theo yêu cầu");
+  return { success: true, message: "✅ Đã hủy số và hoàn tiền vào ví của bạn" };
+}
+
 /**
- * Xử lý hủy đơn và hoàn tiền tự động 5.000đ
+ * Xử lý hủy đơn và hoàn tiền theo đúng số tiền của đơn
  */
 async function handleTimeoutOrCancel(bot, orderId, reason = "Đã hủy") {
   stopRentalPolling(orderId);
@@ -220,5 +257,6 @@ module.exports = {
   startRentalPolling,
   stopRentalPolling,
   checkOtpManually,
+  cancelPendingRental,
   handleTimeoutOrCancel,
 };

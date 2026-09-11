@@ -29,6 +29,7 @@ function adminMenu() {
   return Markup.keyboard([
     ["📊 Số dư Provider & Thống kê", "💰 Quản lý ví khách"],
     ["📜 Lịch sử thuê OTP"],
+    ["📢 Thông báo toàn bộ người dùng"],
     ["⬅️ Về menu"],
   ]).resize().persistent();
 }
@@ -53,9 +54,13 @@ function otpCountdownButtonLabel(secondsLeft = 240) {
   return `${statusIcon} CÒN ${formatCountdown(totalSeconds)} • LẤY MÃ OTP`;
 }
 
-function otpRentalInlineKeyboard(orderId, secondsLeft = 240) {
-  return Markup.inlineKeyboard([
+function otpRentalInlineKeyboard(orderId, secondsLeft = 240, canCancel = false) {
+  const rows = [
     [Markup.button.callback(otpCountdownButtonLabel(secondsLeft), `CHECK_OTP:${orderId}`)],
+  ];
+  if (canCancel) rows.push([Markup.button.callback("🛑 Hủy thuê số & hoàn tiền", `CANCEL_OTP:${orderId}`)]);
+  return Markup.inlineKeyboard([
+    ...rows,
   ]);
 }
 
