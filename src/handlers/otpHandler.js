@@ -31,7 +31,8 @@ function registerOtpHandler(bot) {
     const productId = String(config.OTP_PRODUCT_ID);
     const productsRes = await otpService.getProviderProducts(serverId);
     const configuredProduct = productsRes?.products?.find((product) => String(product.id) === productId);
-    const price = Number(configuredProduct?.price_vnd) || config.OTP_PRICE_VND;
+    // Giá bán cho người dùng luôn lấy từ cấu hình bot, không lấy giá gốc từ provider.
+    const price = config.OTP_PRICE_VND;
     const serviceName = configuredProduct?.name || "Shopee";
     const currentBalance = Number(user.balance) || 0;
 
