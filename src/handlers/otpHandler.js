@@ -60,12 +60,25 @@ function productCatalogError(response) {
   return response?.error || response?.message || "Không thể tải danh sách sản phẩm từ nhà cung cấp";
 }
 
+const productCache = new Map();
+const PRODUCT_CACHE_TTL_MS = 10000;
+
 async function loadProducts(serverId = "") {
+  const cacheKey = String(serverId);
+  const cached = productCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < PRODUCT_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
   const response = await otpService.getProviderProducts(serverId);
-  return {
+  const value = {
     response,
     products: normalizeProducts(response?.products, serverId),
   };
+  if (response?.success && Array.isArray(response.products)) {
+    productCache.set(cacheKey, { createdAt: Date.now(), value });
+  }
+  return value;
 }
 
 async function showServerSelection(ctx) {
@@ -87,6 +100,8 @@ async function showServerSelection(ctx) {
 }
 
 function registerOtpHandler(bot) {
+  const activeRentals = new Set();
+
   // Bấm "📱 Thuê OTP Shopee"
   bot.hears("📱 Thuê OTP Shopee", async (ctx) => {
     return showServerSelection(ctx);
@@ -94,13 +109,19 @@ function registerOtpHandler(bot) {
 
   async function rentSelectedProduct(ctx, serverId, encodedProductId) {
     const from = ctx.from;
-    const productId = decodeURIComponent(encodedProductId);
-    const { response: productsRes, products } = await loadProducts(serverId);
-    const product = products.find((item) => String(item.id) === productId);
+    let waitMsg = null;
+    let charged = false;
+    let orderCreated = false;
+    let createdOrderId = null;
+    let createdExpiresAtMs = null;
+    let rental = null;
 
-    if (!productsRes?.success || !product) {
-      return ctx.reply(`❌ Sản phẩm không còn khả dụng. ${productCatalogError(productsRes)}.`);
-    }
+    try {
+    const productId = decodeURIComponent(encodedProductId);
+    const cachedCatalog = productCache.get(String(serverId))?.value;
+    // Nút đã chứa product_id nên không cần gọi lại API products khi thuê.
+    // Nếu nút quá cũ, API rent sẽ báo mã không hợp lệ và hệ thống sẽ hoàn tiền.
+    const product = cachedCatalog?.products?.find((item) => String(item.id) === productId) || { id: productId };
 
     const user = await db.getOrCreateUser(from.id, {
       username: from.username || "",
@@ -133,25 +154,8 @@ function registerOtpHandler(bot) {
       );
     }
 
-    // Kiểm tra thêm ví nhà cung cấp trước khi trừ ví người dùng. Nếu endpoint
-    // balance tạm lỗi thì vẫn tiếp tục để API thuê xử lý như bình thường.
-    const providerBalance = await otpService.getProviderBalance();
-    const providerCashBalance = Number(providerBalance?.cash_balance_vnd);
-    const providerPrice = Number(product?.price_vnd);
-    if (
-      providerBalance?.success &&
-      Number.isFinite(providerCashBalance) &&
-      Number.isFinite(providerPrice) &&
-      providerPrice > 0 &&
-      providerCashBalance < providerPrice
-    ) {
-      return ctx.reply(
-        "⚠️ Nhà cung cấp đang không đủ số dư để cấp gói này. Vui lòng thử lại sau ít phút."
-      );
-    }
-
     // 2. Thông báo đang xử lý
-    const waitMsg = await ctx.reply("⏳ <i>Đang kết nối nhà mạng để lấy số điện thoại Shopee... Vui lòng đợi trong giây lát.</i>", {
+    waitMsg = await ctx.reply("⏳ <i>Đang kết nối nhà mạng để lấy số điện thoại Shopee... Vui lòng đợi trong giây lát.</i>", {
       parse_mode: "HTML",
     });
 
@@ -163,13 +167,15 @@ function registerOtpHandler(bot) {
       } catch {}
       return ctx.reply("❌ Không thể trừ tiền ví: " + (deductRes.error || "Lỗi giao dịch"));
     }
+    charged = true;
 
     // 4. Gọi API nhà cung cấp SIM
     const rentRes = await otpService.rentOtp({ serverId, productId });
 
     if (!rentRes || !rentRes.success || !rentRes.rental || !rentRes.rental.phone_number) {
       // Hoàn tiền ngay lập tức nếu API lỗi hoặc hết số
-      await db.changeUserBalance(from.id, price);
+      const refundRes = await db.changeUserBalance(from.id, price);
+      charged = !refundRes.success;
       try {
         await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
       } catch {}
@@ -187,12 +193,13 @@ function registerOtpHandler(bot) {
     }
 
     // 5. Thuê thành công, tạo đơn hàng
-    const rental = rentRes.rental;
+    rental = rentRes.rental;
     const orderId = generateOrderId();
     const providerExpiresAt = new Date(rental.expires_at || "");
     const expiresAt = Number.isNaN(providerExpiresAt.getTime()) || providerExpiresAt.getTime() <= Date.now()
       ? new Date(Date.now() + config.OTP_TIMEOUT_SECONDS * 1000)
       : providerExpiresAt;
+    createdExpiresAtMs = expiresAt.getTime();
 
     await db.createOrder({
       id: orderId,
@@ -205,6 +212,8 @@ function registerOtpHandler(bot) {
       serverId,
       productId,
     });
+    orderCreated = true;
+    createdOrderId = orderId;
 
     try {
       await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
@@ -232,6 +241,43 @@ function registerOtpHandler(bot) {
       messageId: sentMsg.message_id,
       serverId,
     });
+    } catch (err) {
+      console.error(`[OTP Handler] Lỗi thuê số cho UID ${from?.id}:`, err.message);
+
+      if (orderCreated && createdOrderId && rental?.id) {
+        // Đã tạo đơn thì giữ tiền và tiếp tục theo dõi, kể cả khi gửi tin nhắn bị lỗi.
+        rentalManager.startRentalPolling(bot, createdOrderId, rental.id, from.id, createdExpiresAtMs, { serverId });
+        try {
+          return await ctx.reply("✅ Đơn thuê đã được tạo. Hệ thống vẫn đang tự động chờ mã OTP cho bạn.");
+        } catch {}
+        return;
+      }
+
+      if (charged) {
+        const refundRes = await db.changeUserBalance(from.id, config.OTP_PRICE_VND);
+        if (refundRes.success) charged = false;
+      }
+      if (waitMsg?.message_id) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
+        } catch {}
+      }
+
+      const refundText = charged
+        ? "Vui lòng liên hệ admin để kiểm tra giao dịch hoàn tiền."
+        : `Hệ thống đã hoàn lại ${formatMoney(config.OTP_PRICE_VND)}đ vào ví của bạn.`;
+      try {
+        return await ctx.reply(
+          `❌ <b>KHÔNG THỂ TẠO LỆNH THUÊ!</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📌 <b>Lý do:</b> ${escapeHtml(err.message || "Nhà cung cấp không phản hồi")}\n` +
+          `💰 ${refundText}\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `Vui lòng thử lại sau ít phút.`,
+          { parse_mode: "HTML" }
+        );
+      } catch {}
+    }
   }
 
   // Hiển thị lại danh sách hai server khi người dùng bấm "làm mới" hoặc quay lại.
@@ -283,6 +329,12 @@ function registerOtpHandler(bot) {
 
   bot.action(/^OTP_PRODUCT:([12]):(.+)$/, async (ctx) => {
     const serverId = ctx.match[1];
+    const lockKey = `${ctx.from?.id}:${serverId}:${ctx.match[2]}`;
+    if (activeRentals.has(lockKey)) {
+      return ctx.answerCbQuery("⏳ Lệnh thuê trước đó đang được xử lý...", { show_alert: true });
+    }
+
+    activeRentals.add(lockKey);
     try {
       await ctx.answerCbQuery("Đang tạo lệnh thuê...");
       try {
@@ -291,6 +343,8 @@ function registerOtpHandler(bot) {
       return await rentSelectedProduct(ctx, serverId, ctx.match[2]);
     } catch (e) {
       return ctx.reply("❌ Không thể thuê sản phẩm: " + e.message);
+    } finally {
+      activeRentals.delete(lockKey);
     }
   });
 
