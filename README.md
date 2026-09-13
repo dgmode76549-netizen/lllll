@@ -5,7 +5,7 @@ Hệ thống Telegram Bot tự động hóa 100% dịch vụ cho thuê OTP Shope
 ---
 
 ## 🌟 Tính Năng Nổi Bật
-- **📱 Thuê OTP Shopee Tự Động**: Trừ ví 5.000đ, cấp SĐT ngay lập tức, tự động lắng nghe mã OTP từ nhà cung cấp (mỗi 2.5s).
+- **📱 Thuê OTP Shopee Tự Động**: Khi bấm thuê, người dùng chọn SV1 hoặc SV2, xem danh mục sản phẩm cập nhật từ nhà cung cấp, sau đó bot trừ ví, cấp SĐT và tự động lắng nghe mã OTP (mỗi 2.5s).
 - **⏱️ Đếm Ngược & Hoàn Tiền Tự Động**: Nút lấy OTP đếm ngược 4 phút (240s). Nếu hết giờ không có mã OTP, bot tự động hoàn lại 5.000đ về ví khách hàng.
 - **💳 Nạp Tiền VietQR Tự Động (Casso)**: Tạo mã QR nạp tiền MBBank với mã định danh ngẫu nhiên duy nhất, hiệu lực trong 10 phút. Quá 10 phút tự động hủy lệnh.
 - **🌐 Webhook Vercel Tích Hợp**: Có sẵn module webhook serverless trong thư mục `casso-vercel/` để nhận biến động số dư từ Casso.
@@ -86,6 +86,8 @@ CASSO_QR_TEMPLATE=compact2
 PORT=3000
 WEBHOOK_PORT=8000
 ```
+
+Bot gọi `GET /api/otp/products` để lấy sản phẩm của cả hai server. SV2 hiển thị thêm trường `count` và khi thuê sẽ gửi đúng `server: "2"` cùng mã `product_id` dạng `s2:<country>:<service>`. Giá trừ ví vẫn theo `OTP_PRICE_VND`; đặt giá trị này bằng `0` để dùng `price_vnd` từ API.
 
 ### 3. Khởi tạo Database
 Mở file `schema.sql` và chạy trong SQL Editor trên [Supabase](https://supabase.com).

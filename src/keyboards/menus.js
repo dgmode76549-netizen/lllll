@@ -70,6 +70,38 @@ function insufficientBalanceKeyboard() {
   ]);
 }
 
+function otpServerSelectionKeyboard(products = []) {
+  const counts = { "1": 0, "2": 0 };
+  for (const product of products) {
+    const productId = String(product?.id || "");
+    const serverId = String(product?.server_id || (productId.startsWith("s2:") ? "2" : "1"));
+    if (serverId === "1" || serverId === "2") counts[serverId] += 1;
+  }
+
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback(`🖥️ SV1${counts["1"] ? ` (${counts["1"]} gói)` : ""}`, "OTP_SERVER:1"),
+      Markup.button.callback(`🖥️ SV2${counts["2"] ? ` (${counts["2"]} gói)` : ""}`, "OTP_SERVER:2"),
+    ],
+    [Markup.button.callback("🔄 Làm mới danh sách", "OTP_SERVERS")],
+  ]);
+}
+
+function otpProductSelectionKeyboard(serverId, products = []) {
+  const rows = products.map((product) => {
+    const productId = encodeURIComponent(String(product.id));
+    const name = String(product.name || product.id || "Sản phẩm").slice(0, 32);
+    const price = Number(product.price_vnd);
+    const priceText = Number.isFinite(price) && price > 0 ? ` • ${price.toLocaleString("vi-VN")}đ` : "";
+    const count = Number(product.count);
+    const countText = String(serverId) === "2" && Number.isFinite(count) ? ` • còn ${count.toLocaleString("vi-VN")}` : "";
+    return [Markup.button.callback(`${name}${priceText}${countText}`, `OTP_PRODUCT:${serverId}:${productId}`)];
+  });
+
+  rows.push([Markup.button.callback("↩️ Chọn server khác", "OTP_SERVERS")]);
+  return Markup.inlineKeyboard(rows);
+}
+
 module.exports = {
   isUserAdmin,
   mainMenu,
@@ -80,4 +112,6 @@ module.exports = {
   otpCountdownButtonLabel,
   otpRentalInlineKeyboard,
   insufficientBalanceKeyboard,
+  otpServerSelectionKeyboard,
+  otpProductSelectionKeyboard,
 };
