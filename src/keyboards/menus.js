@@ -91,8 +91,7 @@ function otpProductSelectionKeyboard(serverId, products = []) {
   const rows = products.map((product) => {
     const productId = encodeURIComponent(String(product.id));
     const name = String(product.name || product.id || "Sản phẩm").slice(0, 32);
-    const price = Number(product.price_vnd);
-    const priceText = Number.isFinite(price) && price > 0 ? ` • ${price.toLocaleString("vi-VN")}đ` : "";
+    const priceText = " • 5.000đ";
     const count = Number(product.count);
     const countText = String(serverId) === "2" && Number.isFinite(count) ? ` • còn ${count.toLocaleString("vi-VN")}` : "";
     return [Markup.button.callback(`${name}${priceText}${countText}`, `OTP_PRODUCT:${serverId}:${productId}`)];

@@ -87,7 +87,7 @@ PORT=3000
 WEBHOOK_PORT=8000
 ```
 
-Bot gọi `GET /api/otp/products` để lấy sản phẩm của cả hai server. SV2 hiển thị thêm trường `count` và khi thuê sẽ gửi đúng `server: "2"` cùng mã `product_id` dạng `s2:<country>:<service>`. Giá trừ ví vẫn theo `OTP_PRICE_VND`; đặt giá trị này bằng `0` để dùng `price_vnd` từ API.
+Bot gọi `GET /api/otp/products` để lấy sản phẩm của cả hai server. SV2 hiển thị thêm trường `count` và khi thuê sẽ gửi đúng `server: "2"` cùng mã `product_id` dạng `s2:<country>:<service>`. Tất cả server và sản phẩm đều đồng giá 5.000đ/lượt; trường `price_vnd` chỉ là giá gốc của nhà cung cấp.
 
 ### 3. Khởi tạo Database
 Mở file `schema.sql` và chạy trong SQL Editor trên [Supabase](https://supabase.com).

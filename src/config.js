@@ -37,7 +37,8 @@ const config = {
   // Server 2 dùng mã sản phẩm dạng s2:<country>:<service>.
   OTP_SERVER_ID: String(process.env.OTP_SERVER_ID || "2"),
   OTP_PRODUCT_ID: process.env.OTP_PRODUCT_ID || "s2:10:ka",
-  OTP_PRICE_VND: Number(process.env.OTP_PRICE_VND) || 5000,
+  // Giá bán OTP cố định cho mọi server và mọi sản phẩm.
+  OTP_PRICE_VND: 5000,
   OTP_TIMEOUT_SECONDS: Number(process.env.OTP_TIMEOUT_SECONDS) || 240,
 
   // Chống spam Telegram

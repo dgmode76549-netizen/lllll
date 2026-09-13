@@ -40,8 +40,7 @@ function normalizeProducts(products, serverId = "") {
 }
 
 function productPrice(product) {
-  const providerPrice = Number(product?.price_vnd);
-  return config.OTP_PRICE_VND > 0 ? config.OTP_PRICE_VND : providerPrice;
+  return config.OTP_PRICE_VND;
 }
 
 function productLabel(product) {
@@ -108,7 +107,7 @@ function registerOtpHandler(bot) {
       name: [from.first_name, from.last_name].filter(Boolean).join(" ").trim(),
     });
 
-    // Giá bán cho người dùng lấy từ cấu hình bot; nếu cấu hình bằng 0 thì dùng giá API.
+    // Giá bán cho mọi server/sản phẩm luôn cố định 5.000đ.
     const price = productPrice(product);
     if (!Number.isFinite(price) || price <= 0) {
       return ctx.reply("❌ Sản phẩm chưa có giá thuê hợp lệ. Vui lòng chọn gói khác.");
@@ -274,7 +273,7 @@ function registerOtpHandler(bot) {
         `🖥️ <b>DANH SÁCH GÓI SV${serverId}</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `Chọn sản phẩm muốn thuê${serverId === "2" ? ". SV2 hiển thị thêm số lượng kho." : "."}\n` +
-          `${config.OTP_PRICE_VND > 0 ? `Giá trừ ví: ${formatMoney(config.OTP_PRICE_VND)}đ/gói.` : "Giá trừ ví theo giá API."}`,
+          `Giá trừ ví cố định: ${formatMoney(config.OTP_PRICE_VND)}đ/gói.`,
         { parse_mode: "HTML", ...otpProductSelectionKeyboard(serverId, products) }
       );
     } catch (e) {
