@@ -6,6 +6,17 @@ const fetchFn = (...args) => {
   return import("node-fetch").then(({ default: f }) => f(...args));
 };
 
+async function request(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.OTP_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetchFn(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function getHeaders() {
   const headers = {
     "Content-Type": "application/json",
@@ -25,7 +36,7 @@ function getHeaders() {
 async function getProviderBalance() {
   try {
     const url = `${config.OTP_BASE_URL}/api/otp/balance`;
-    const res = await fetchFn(url, {
+    const res = await request(url, {
       method: "GET",
       headers: getHeaders(),
     });
@@ -45,7 +56,7 @@ async function getProviderProducts(serverId = "") {
   try {
     const query = serverId ? `?server=${encodeURIComponent(serverId)}` : "";
     const url = `${config.OTP_BASE_URL}/api/otp/products${query}`;
-    const res = await fetchFn(url, {
+    const res = await request(url, {
       method: "GET",
       headers: getHeaders(),
     });
@@ -71,7 +82,7 @@ async function rentOtp(options = {}) {
     const url = `${config.OTP_BASE_URL}/api/otp/rent`;
     const body = { product_id: String(productId) };
     if (serverId === "2") body.server = "2";
-    const res = await fetchFn(url, {
+    const res = await request(url, {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify(body),
@@ -109,7 +120,7 @@ async function cancelRental(rentalId) {
     const url = `${config.OTP_BASE_URL}/api/otp/rentals/cancel`;
     const headers = getHeaders();
     headers["Content-Type"] = "application/x-www-form-urlencoded";
-    const res = await fetchFn(url, {
+    const res = await request(url, {
       method: "POST",
       headers,
       body: new URLSearchParams({ rental_id: String(rentalId) }).toString(),
@@ -129,7 +140,7 @@ async function cancelRental(rentalId) {
 async function getRentalStatus(rentalId) {
   try {
     const url = `${config.OTP_BASE_URL}/api/otp/rentals/${encodeURIComponent(rentalId)}`;
-    const res = await fetchFn(url, {
+    const res = await request(url, {
       method: "GET",
       headers: getHeaders(),
     });

@@ -13,6 +13,7 @@ const registerAdminHandler = require("./handlers/adminHandler");
 
 // Casso Watcher
 const { startCassoWatcher } = require("./services/cassoWatcher");
+const { notifyAdminsTopupSuccess } = require("./services/adminNotifier");
 
 if (!config.BOT_TOKEN) {
   console.error("❌ Thiếu BOT_TOKEN trong .env");
@@ -65,6 +66,12 @@ app.get("/", (req, res) => {
 // Endpoint nhận Webhook biến động số dư ngân hàng (SePay / Casso / Custom)
 app.post("/api/payment/webhook", async (req, res) => {
   try {
+    const webhookSecret = req.headers["secure-token"] || req.headers["x-casso-secret"] || "";
+    if (config.CASSO_WEBHOOK_SECRET && webhookSecret !== config.CASSO_WEBHOOK_SECRET) {
+      console.warn("[Webhook Bank] Từ chối request vì secret không hợp lệ.");
+      return res.status(401).json({ success: false, error: "Webhook unauthorized" });
+    }
+
     const body = req.body || {};
     console.log("[Webhook Bank] Nhận dữ liệu:", JSON.stringify(body));
 
@@ -82,6 +89,14 @@ app.post("/api/payment/webhook", async (req, res) => {
         const result = await db.changeUserBalance(uid, amount);
         if (result.success) {
           const user = await db.getUser(uid);
+          await notifyAdminsTopupSuccess(bot, {
+            telegramId: uid,
+            amount,
+            newBalance: user ? user.balance : result.newBalance,
+            transactionId: body.id || body.transactionId || "WEBHOOK",
+            payContent: content,
+            user,
+          });
           try {
             await bot.telegram.sendMessage(
               uid,

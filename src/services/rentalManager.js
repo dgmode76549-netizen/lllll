@@ -63,6 +63,9 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
       } catch {}
     }
 
+    // Không gọi API nhà cung cấp chồng lên nhau nếu một request bị chậm.
+    if (session.polling) return;
+    session.polling = true;
     try {
       const res = await otpService.getRentalStatus(rentalId);
       if (res && res.success && res.rental) {
@@ -110,6 +113,9 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
       }
     } catch (err) {
       console.error(`[RentalManager] Lỗi polling đơn ${orderId}:`, err.message);
+    } finally {
+      const currentSession = activePollers.get(orderId);
+      if (currentSession === session) currentSession.polling = false;
     }
   }, 2500);
 
@@ -121,6 +127,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
     expiresAtMs,
     meta,
     serverId: String(meta.serverId || config.OTP_SERVER_ID || "1"),
+    polling: false,
     stopped: false,
   });
 }

@@ -40,6 +40,7 @@ const config = {
   // Giá bán OTP cố định cho mọi server và mọi sản phẩm.
   OTP_PRICE_VND: 5000,
   OTP_TIMEOUT_SECONDS: Number(process.env.OTP_TIMEOUT_SECONDS) || 240,
+  OTP_REQUEST_TIMEOUT_MS: Number(process.env.OTP_REQUEST_TIMEOUT_MS) || 15000,
 
   // Chống spam Telegram
   SPAM_WINDOW_SECONDS: Number(process.env.SPAM_WINDOW_SECONDS) || 10,
