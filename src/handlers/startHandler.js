@@ -18,9 +18,10 @@ function registerStartHandler(bot) {
 
     const welcomeMsg =
       `👋 Xin chào <b>${name || "bạn"}</b>!\n` +
-      `Chào mừng bạn đến với hệ thống <b>Thuê OTP Shopee Tự Động</b>.\n` +
-      `💰 Giá thuê: <b>${formatMoney(config.OTP_PRICE_VND)}đ / số</b>\n\n` +
-      `👉 Chọn chức năng dưới menu để bắt đầu!`;
+      `Chào mừng bạn đến với hệ thống dịch vụ tự động.\n\n` +
+      `🛒 <b>Mua acc:</b> mua sản phẩm/link trong kho bằng số dư.\n` +
+      `📱 <b>Thuê số:</b> thuê số nhận OTP Shopee, từ ${formatMoney(config.OTP_PRICE_VND)}đ/lần.\n\n` +
+      `👉 Chọn một dịch vụ bên dưới để bắt đầu!`;
 
     return ctx.reply(welcomeMsg, {
       parse_mode: "HTML",

@@ -7,7 +7,7 @@ function isUserAdmin(userId) {
 
 function mainMenu(userId) {
   const rows = [
-    ["📱 Thuê OTP Shopee"],
+    ["🛒 Mua acc", "📱 Thuê số"],
     ["💳 Nạp tiền", "👤 Tài khoản"],
     ["📜 Lịch sử", "🆘 Hỗ trợ"],
   ];
@@ -28,6 +28,7 @@ function topupMenu() {
 function adminMenu() {
   return Markup.keyboard([
     ["📊 Số dư Provider & Thống kê", "💰 Quản lý ví khách"],
+    ["🛒 Quản lý mua acc"],
     ["📜 Lịch sử thuê OTP"],
     ["📢 Thông báo toàn bộ người dùng"],
     ["⬅️ Về menu"],
@@ -38,6 +39,15 @@ function adminWalletMenu() {
   return Markup.keyboard([
     ["➕ Cộng tiền", "➖ Trừ tiền", "= Set số dư"],
     ["🧾 Xem ví khách", "⬅️ Admin Panel"],
+  ]).resize().persistent();
+}
+
+function accountAdminMenu() {
+  return Markup.keyboard([
+    ["➕ Thêm sản phẩm acc", "➕ Nhập thêm link kho"],
+    ["📦 Xem kho acc", "🧾 Đơn mua acc"],
+    ["📊 Thống kê doanh số acc"],
+    ["⬅️ Admin Panel"],
   ]).resize().persistent();
 }
 
@@ -101,11 +111,33 @@ function otpProductSelectionKeyboard(serverId, products = []) {
   return Markup.inlineKeyboard(rows);
 }
 
+function accountProductSelectionKeyboard(products = []) {
+  const rows = products.map((product) => {
+    const id = encodeURIComponent(String(product.id));
+    const stock = Number(product.available_count) || 0;
+    return [Markup.button.callback(
+      `🛍️ ${String(product.name || "Sản phẩm").slice(0, 28)} • ${Number(product.price || 0).toLocaleString("vi-VN")}đ • còn ${stock}`,
+      `ACCOUNT_PRODUCT:${id}`
+    )];
+  });
+  rows.push([Markup.button.callback("🔄 Làm mới kho", "ACCOUNT_PRODUCTS")]);
+  return Markup.inlineKeyboard(rows);
+}
+
+function accountProductDetailKeyboard(productId) {
+  const id = encodeURIComponent(String(productId));
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("✅ Mua ngay bằng số dư", `ACCOUNT_BUY:${id}`)],
+    [Markup.button.callback("↩️ Danh sách sản phẩm", "ACCOUNT_PRODUCTS")],
+  ]);
+}
+
 module.exports = {
   isUserAdmin,
   mainMenu,
   topupMenu,
   adminMenu,
+  accountAdminMenu,
   adminWalletMenu,
   formatCountdown,
   otpCountdownButtonLabel,
@@ -113,4 +145,6 @@ module.exports = {
   insufficientBalanceKeyboard,
   otpServerSelectionKeyboard,
   otpProductSelectionKeyboard,
+  accountProductSelectionKeyboard,
+  accountProductDetailKeyboard,
 };

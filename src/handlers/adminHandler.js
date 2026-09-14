@@ -1,7 +1,7 @@
 const otpService = require("../services/otpService");
 const db = require("../db/supabase");
 const config = require("../config");
-const { adminMenu, adminWalletMenu, mainMenu, isUserAdmin } = require("../keyboards/menus");
+const { adminMenu, adminWalletMenu, accountAdminMenu, mainMenu, isUserAdmin } = require("../keyboards/menus");
 
 function formatMoney(n) {
   return (Number(n) || 0).toLocaleString("vi-VN");
@@ -112,6 +112,45 @@ function registerAdminHandler(bot) {
     });
   });
 
+  bot.hears("🛒 Quản lý mua acc", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    adminStates.delete(ctx.from.id);
+    return ctx.reply(
+      "🛒 <b>QUẢN LÝ KHO MUA ACC</b>\n\n" +
+        "Tạo sản phẩm mới kèm link đầu tiên, hoặc nhập thêm link vào sản phẩm đang có. Dữ liệu được lưu vào Supabase.",
+      { parse_mode: "HTML", ...accountAdminMenu() }
+    );
+  });
+
+  bot.hears("➕ Thêm sản phẩm acc", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_NAME" });
+    return ctx.reply("1️⃣ Gửi tên sản phẩm, ví dụ: <b>GG AI Pro 18 tháng</b>", { parse_mode: "HTML" });
+  });
+
+  bot.hears("➕ Nhập thêm link kho", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const products = await db.getAccountProducts(true);
+    const list = products.map((p) => `<code>${escapeHtml(p.id)}</code> — ${escapeHtml(p.name)}`).join("\n");
+    adminStates.set(ctx.from.id, { step: "ACCOUNT_STOCK_PRODUCT" });
+    return ctx.reply(`Gửi <b>ID sản phẩm</b> cần nhập link:\n\n${list || "Chưa có sản phẩm"}`, { parse_mode: "HTML" });
+  });
+
+  bot.hears("📦 Xem kho acc", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    return executeViewAccountStock(ctx);
+  });
+
+  bot.hears("🧾 Đơn mua acc", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    return executeViewAccountOrders(ctx);
+  });
+
+  bot.hears("📊 Thống kê doanh số acc", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    return executeViewAccountStats(ctx);
+  });
+
   bot.hears("📜 Lịch sử thuê OTP", async (ctx) => {
     if (!requireAdmin(ctx)) return;
     adminStates.delete(ctx.from.id);
@@ -210,6 +249,53 @@ function registerAdminHandler(bot) {
     }
 
     const parts = text.split(/\s+/);
+
+    if (text.toLowerCase() === "cancel" || text.toLowerCase() === "hủy") {
+      adminStates.delete(ctx.from.id);
+      return ctx.reply("✅ Đã hủy thao tác.", { ...accountAdminMenu() });
+    }
+
+    if (st.step === "ACCOUNT_ADD_NAME") {
+      if (text.length < 2) return ctx.reply("❌ Tên sản phẩm quá ngắn. Vui lòng gửi lại.");
+      adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_PRICE", name: text });
+    return ctx.reply("2️⃣ Gửi giá bán bằng VNĐ, ví dụ: <code>60000</code>", { parse_mode: "HTML" });
+    }
+
+    if (st.step === "ACCOUNT_ADD_PRICE") {
+      const price = Number(text.replace(/\s/g, "").replace(/k$/i, "000").replace(/[.,]/g, ""));
+      if (!Number.isFinite(price) || price < 0) return ctx.reply("❌ Giá không hợp lệ. Hãy gửi số tiền, ví dụ 60000.");
+      adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_DESC", name: st.name, price });
+      return ctx.reply("3️⃣ Gửi mô tả sản phẩm (hoặc gửi <code>-</code> để bỏ qua).", { parse_mode: "HTML" });
+    }
+
+    if (st.step === "ACCOUNT_ADD_DESC") {
+      adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_STOCK", name: st.name, price: st.price, description: text === "-" ? "" : text });
+      return ctx.reply("4️⃣ Gửi link/nội dung đầu tiên đưa vào kho. Link này sẽ giao cho khách đầu tiên mua.");
+    }
+
+    if (st.step === "ACCOUNT_ADD_STOCK") {
+      adminStates.delete(ctx.from.id);
+      const productId = `acc-${Date.now()}`;
+      const product = await db.createAccountProduct({ id: productId, name: st.name, price: st.price, description: st.description });
+      if (!product) return ctx.reply("❌ Không thể tạo sản phẩm. Kiểm tra kết nối Supabase rồi thử lại.", { ...accountAdminMenu() });
+      const stock = await db.addAccountInventory(productId, text, ctx.from.id);
+      if (!stock) return ctx.reply("⚠️ Đã tạo sản phẩm nhưng chưa nhập được link kho. Bạn có thể dùng nút nhập thêm link.", { ...accountAdminMenu() });
+      return ctx.reply(`✅ Đã thêm sản phẩm và 1 link vào kho.\n🆔 ID: <code>${escapeHtml(productId)}</code>`, { parse_mode: "HTML", ...accountAdminMenu() });
+    }
+
+    if (st.step === "ACCOUNT_STOCK_PRODUCT") {
+      const product = await db.getAccountProduct(text);
+      if (!product) return ctx.reply("❌ Không tìm thấy ID sản phẩm. Gửi lại hoặc gõ cancel.");
+      adminStates.set(ctx.from.id, { step: "ACCOUNT_STOCK_VALUE", productId: product.id, productName: product.name });
+      return ctx.reply(`Gửi link/nội dung kho cho <b>${escapeHtml(product.name)}</b>:`, { parse_mode: "HTML" });
+    }
+
+    if (st.step === "ACCOUNT_STOCK_VALUE") {
+      adminStates.delete(ctx.from.id);
+      const stock = await db.addAccountInventory(st.productId, text, ctx.from.id);
+      if (!stock) return ctx.reply("❌ Không thể nhập link vào kho. Vui lòng thử lại.", { ...accountAdminMenu() });
+      return ctx.reply(`✅ Đã nhập thêm 1 link vào kho <b>${escapeHtml(st.productName)}</b>.`, { parse_mode: "HTML", ...accountAdminMenu() });
+    }
 
     if (st.step === "WAIT_ADD") {
       adminStates.delete(ctx.from.id);
@@ -479,6 +565,56 @@ async function executeViewAllHistory(ctx) {
     `💡 Dùng <code>/history UID</code> để xem riêng một người dùng.`;
 
   return ctx.reply(message, { parse_mode: "HTML", ...adminMenu() });
+}
+
+async function executeViewAccountStock(ctx) {
+  const products = await db.getAccountProducts(true);
+  if (!products?.length) return ctx.reply("📦 Kho acc chưa có sản phẩm.", { ...accountAdminMenu() });
+  const lines = products.map((product) =>
+    `🆔 <code>${escapeHtml(product.id)}</code>\n` +
+    `📦 ${escapeHtml(product.name)}\n` +
+    `💵 ${formatMoney(product.price)}đ\n` +
+    `📊 Còn: <b>${Number(product.available_count) || 0}</b> link\n` +
+    `🔘 Trạng thái: ${product.active === false ? "TẮT" : "ĐANG BÁN"}`
+  );
+  return ctx.reply(`📦 <b>KHO MUA ACC</b>\n━━━━━━━━━━━━━━━━━━━━\n${lines.join("\n━━━━━━━━━━━━━━━━━━━━\n")}`, { parse_mode: "HTML", ...accountAdminMenu() });
+}
+
+async function executeViewAccountOrders(ctx) {
+  const orders = await db.getRecentAccountOrders(20);
+  if (!orders?.length) return ctx.reply("🧾 Chưa có đơn mua acc nào.", { ...accountAdminMenu() });
+  const lines = orders.map((order, index) =>
+    `${index + 1}. <code>${escapeHtml(order.id)}</code>\n` +
+    `👤 UID: <code>${escapeHtml(order.telegram_id)}</code>\n` +
+    `📦 ${escapeHtml(order.product_name)} — ${formatMoney(order.amount)}đ\n` +
+    `📅 ${formatTableDate(order.created_at)} — ${escapeHtml(order.status)}`
+  );
+  return ctx.reply(`🧾 <b>20 ĐƠN MUA ACC GẦN NHẤT</b>\n━━━━━━━━━━━━━━━━━━━━\n${lines.join("\n━━━━━━━━━━━━━━━━━━━━\n")}`, { parse_mode: "HTML", ...accountAdminMenu() });
+}
+
+async function executeViewAccountStats(ctx) {
+  const stats = await db.getAccountStats();
+  const productLines = (stats.byProduct || []).map((product, index) =>
+    `${index + 1}. ${escapeHtml(product.productName)}\n` +
+    `   📦 Còn ${product.available} • Đã bán ${product.sold}\n` +
+    `   🧾 ${product.orders} đơn • 💰 ${formatMoney(product.revenue)}đ`
+  );
+  const message =
+    `📊 <b>THỐNG KÊ DOANH SỐ KHO MUA ACC</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📦 <b>Sản phẩm:</b> ${stats.activeProducts}/${stats.totalProducts} đang bán\n` +
+    `🟢 <b>Link còn trong kho:</b> ${stats.availableStock}\n` +
+    `✅ <b>Link đã bán:</b> ${stats.soldStock}\n` +
+    `🧾 <b>Tổng đơn hoàn tất:</b> ${stats.totalOrders}\n` +
+    `💰 <b>Tổng doanh thu:</b> ${formatMoney(stats.totalRevenue)}đ\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📅 <b>HÔM NAY</b>\n` +
+    `• Đơn hàng: <b>${stats.todayOrders}</b>\n` +
+    `• Doanh thu: <b>${formatMoney(stats.todayRevenue)}đ</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📈 <b>THEO SẢN PHẨM</b>\n` +
+    (productLines.length ? productLines.join("\n") : "Chưa có dữ liệu bán hàng.");
+  return ctx.reply(message, { parse_mode: "HTML", ...accountAdminMenu() });
 }
 
 module.exports = registerAdminHandler;

@@ -7,6 +7,7 @@ const createAntiSpamMiddleware = require("./middleware/antiSpam");
 // Handlers
 const registerStartHandler = require("./handlers/startHandler");
 const registerOtpHandler = require("./handlers/otpHandler");
+const registerAccountHandler = require("./handlers/accountHandler");
 const registerTopupHandler = require("./handlers/topupHandler");
 const registerHistoryHandler = require("./handlers/historyHandler");
 const registerAdminHandler = require("./handlers/adminHandler");
@@ -29,12 +30,15 @@ bot.use(
     windowMs: config.SPAM_WINDOW_SECONDS * 1000,
     maxRequests: config.SPAM_MAX_REQUESTS,
     blockMs: config.SPAM_BLOCK_SECONDS * 1000,
+    maxConcurrent: config.SPAM_MAX_CONCURRENT,
+    maxTrackedUsers: config.SPAM_MAX_TRACKED_USERS,
   })
 );
 
 // Đăng ký toàn bộ handlers
 registerStartHandler(bot);
 registerOtpHandler(bot);
+registerAccountHandler(bot);
 registerTopupHandler(bot);
 registerHistoryHandler(bot);
 registerAdminHandler(bot);

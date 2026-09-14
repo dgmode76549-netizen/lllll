@@ -1,6 +1,6 @@
 # 🤖 Telegram Bot Thuê OTP Shopee Tự Động & VietQR Casso
 
-Hệ thống Telegram Bot tự động hóa 100% dịch vụ cho thuê OTP Shopee (giá cố định 5.000đ/lần) tích hợp cổng thanh toán VietQR MBBank qua Casso và cơ sở dữ liệu Supabase (PostgreSQL).
+Hệ thống Telegram Bot tự động hóa dịch vụ thuê OTP Shopee (giá cố định 5.000đ/lần) và mua acc/link kỹ thuật số, tích hợp cổng thanh toán VietQR MBBank qua Casso và cơ sở dữ liệu Supabase (PostgreSQL).
 
 ---
 
@@ -10,6 +10,7 @@ Hệ thống Telegram Bot tự động hóa 100% dịch vụ cho thuê OTP Shope
 - **💳 Nạp Tiền VietQR Tự Động (Casso)**: Tạo mã QR nạp tiền MBBank với mã định danh ngẫu nhiên duy nhất, hiệu lực trong 10 phút. Quá 10 phút tự động hủy lệnh.
 - **🌐 Webhook Vercel Tích Hợp**: Có sẵn module webhook serverless trong thư mục `casso-vercel/` để nhận biến động số dư từ Casso.
 - **🗄️ Lưu Trữ 100% Trên Supabase**: Quản lý người dùng, số dư, lịch sử thuê OTP và giao dịch nạp tiền an toàn với hàm nguyên tử `change_user_balance`.
+- **🛒 Mua acc bằng số dư**: Có sản phẩm mặc định `GG AI Pro 18 tháng` giá 60.000đ; admin nhập từng link vào kho, khách mua sẽ nhận link ngay và hệ thống lưu lịch sử.
 - **⚙️ Quản Trị Viên (Admin Panel)**: Xem số dư nhà cung cấp SIM, thống kê đơn hàng, cộng/trừ/set số dư cho khách hàng.
 
 ---
@@ -91,6 +92,8 @@ Bot gọi `GET /api/otp/products` để lấy sản phẩm của cả hai server
 
 ### 3. Khởi tạo Database
 Mở file `schema.sql` và chạy trong SQL Editor trên [Supabase](https://supabase.com).
+
+Sau khi cập nhật phiên bản có kho mua acc, chạy lại toàn bộ `schema.sql` một lần để tạo các bảng `account_products`, `account_inventory`, `account_orders` và RPC thanh toán giữ kho `purchase_account_product`. Sau đó vào `⚙️ Admin Panel` → `🛒 Quản lý mua acc` để nhập link thật vào kho.
 
 ### 4. Khởi chạy Bot
 ```bash

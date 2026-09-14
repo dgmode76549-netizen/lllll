@@ -102,8 +102,8 @@ async function showServerSelection(ctx) {
 function registerOtpHandler(bot) {
   const activeRentals = new Set();
 
-  // Bấm "📱 Thuê OTP Shopee"
-  bot.hears("📱 Thuê OTP Shopee", async (ctx) => {
+  // Bấm "📱 Thuê số" (giữ tên cũ để không làm hỏng menu cũ của người dùng)
+  bot.hears(["📱 Thuê số", "📱 Thuê OTP Shopee"], async (ctx) => {
     return showServerSelection(ctx);
   });
 

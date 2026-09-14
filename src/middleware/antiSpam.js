@@ -1,16 +1,27 @@
 const DEFAULT_WINDOW_MS = 10 * 1000;
 const DEFAULT_MAX_REQUESTS = 8;
 const DEFAULT_BLOCK_MS = 30 * 1000;
+const DEFAULT_MAX_CONCURRENT = 2;
+const DEFAULT_MAX_TRACKED_USERS = 10000;
 
 function toPositiveNumber(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
-function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs } = {}) {
+function notifyBlocked(ctx, message) {
+  if (ctx.callbackQuery) {
+    return ctx.answerCbQuery(message, { show_alert: true }).catch(() => {});
+  }
+  return ctx.reply(message).catch(() => {});
+}
+
+function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs, maxConcurrent, maxTrackedUsers } = {}) {
   const requestWindowMs = toPositiveNumber(windowMs, DEFAULT_WINDOW_MS);
   const requestLimit = Math.max(1, Math.floor(toPositiveNumber(maxRequests, DEFAULT_MAX_REQUESTS)));
   const blockDurationMs = toPositiveNumber(blockMs, DEFAULT_BLOCK_MS);
+  const concurrentLimit = Math.max(1, Math.floor(toPositiveNumber(maxConcurrent, DEFAULT_MAX_CONCURRENT)));
+  const trackedUsersLimit = Math.max(100, Math.floor(toPositiveNumber(maxTrackedUsers, DEFAULT_MAX_TRACKED_USERS)));
   const users = new Map();
 
   // Dọn dữ liệu người dùng không còn hoạt động để Map không tăng vô hạn.
@@ -18,7 +29,7 @@ function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs } =
     const now = Date.now();
     for (const [userId, state] of users) {
       state.timestamps = state.timestamps.filter((timestamp) => now - timestamp < requestWindowMs);
-      if (!state.timestamps.length && state.blockedUntil <= now) {
+      if (!state.timestamps.length && state.blockedUntil <= now && state.inFlight === 0) {
         users.delete(userId);
       }
     }
@@ -34,16 +45,25 @@ function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs } =
     }
 
     const now = Date.now();
-    const state = users.get(userId) || { timestamps: [], blockedUntil: 0, warningSent: false };
+    if (!users.has(userId) && users.size >= trackedUsersLimit) {
+      const evictable = [...users.entries()].find(([, item]) => item.inFlight === 0 && item.blockedUntil <= now);
+      if (evictable) users.delete(evictable[0]);
+    }
+    const state = users.get(userId) || { timestamps: [], blockedUntil: 0, warningSent: false, inFlight: 0 };
 
     if (state.blockedUntil > now) {
       if (!state.warningSent) {
         state.warningSent = true;
-        try {
-          await ctx.reply("🚫 Bạn thao tác quá nhanh. Vui lòng chờ vài giây rồi thử lại.");
-        } catch {}
+        await notifyBlocked(ctx, "🚫 Bạn thao tác quá nhanh. Vui lòng chờ vài giây rồi thử lại.");
       }
       users.set(userId, state);
+      return;
+    }
+
+    // Chặn các callback/tin nhắn chạy chồng lên nhau, tránh một người dùng
+    // bấm liên tục làm treo hàng đợi gọi API/Supabase.
+    if (state.inFlight >= concurrentLimit) {
+      await notifyBlocked(ctx, "⏳ Yêu cầu trước của bạn đang được xử lý, vui lòng chờ một chút.");
       return;
     }
 
@@ -52,19 +72,28 @@ function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs } =
 
     if (state.timestamps.length > requestLimit) {
       state.blockedUntil = now + blockDurationMs;
-      state.warningSent = false;
+      state.warningSent = true;
       users.set(userId, state);
 
-      try {
-        const blockSeconds = Math.ceil(blockDurationMs / 1000);
-        await ctx.reply(`⚠️ Phát hiện thao tác quá liên tục. Bot tạm ngừng xử lý tài khoản của bạn trong ${blockSeconds} giây để chống spam.`);
-      } catch {}
+      const blockSeconds = Math.ceil(blockDurationMs / 1000);
+      await notifyBlocked(ctx, `⚠️ Bạn thao tác quá liên tục. Bot tạm ngừng xử lý trong ${blockSeconds} giây để chống spam.`);
       return;
     }
 
     state.warningSent = false;
+    state.inFlight += 1;
     users.set(userId, state);
-    return next();
+
+    try {
+      return await next();
+    } finally {
+      const current = users.get(userId);
+      if (current) {
+        current.inFlight = Math.max(0, current.inFlight - 1);
+        current.lastSeenAt = Date.now();
+        users.set(userId, current);
+      }
+    }
   };
 }
 
