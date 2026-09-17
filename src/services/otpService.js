@@ -29,6 +29,30 @@ function getHeaders() {
   return headers;
 }
 
+// Nhà cung cấp có thể trả các tên trường khác nhau giữa SV1/SV2.
+// Chuẩn hóa một lần ở đây để handler luôn nhận cùng một cấu trúc.
+function normalizeRental(value = {}) {
+  const source = value?.rental || value?.data?.rental || value?.result?.rental || value?.data || value?.result || value;
+  if (!source || typeof source !== "object") return null;
+
+  const rental = { ...source };
+  rental.id = source.id ?? source.rental_id ?? source.rentalId ?? value.rental_id ?? value.rentalId;
+  rental.phone_number = source.phone_number ?? source.phoneNumber ?? source.phone ?? source.number ?? source.msisdn
+    ?? value.phone_number ?? value.phoneNumber ?? value.phone ?? value.number;
+  rental.otp_code = source.otp_code ?? source.otpCode ?? source.otp ?? source.code;
+  rental.expires_at = source.expires_at ?? source.expiresAt ?? source.expired_at ?? source.expiredAt;
+  rental.status = source.status ?? value.status;
+  return rental;
+}
+
+function normalizeResponse(data) {
+  if (!data || typeof data !== "object") return data;
+  const rental = normalizeRental(data);
+  return rental?.id || rental?.phone_number || rental?.otp_code
+    ? { ...data, rental }
+    : data;
+}
+
 /**
  * Kiểm tra số dư ví tài khoản nhà cung cấp
  * GET /api/otp/balance
@@ -41,7 +65,7 @@ async function getProviderBalance() {
       headers: getHeaders(),
     });
     const data = await res.json();
-    return data;
+    return normalizeResponse(data);
   } catch (error) {
     console.error("❌ Lỗi gọi getProviderBalance:", error.message);
     return { success: false, error: error.message };
@@ -88,23 +112,9 @@ async function rentOtp(options = {}) {
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-
-    // Nếu tạo lệnh thuê thành công nhưng nhà mạng đang cấp số (phone_number tạm trống)
-    if (data && data.success && data.rental && data.rental.id && !data.rental.phone_number) {
-      console.log(`[OTP Service] Đang đợi cấp SĐT cho rental ${data.rental.id}...`);
-      for (let i = 0; i < 6; i++) {
-        await new Promise((r) => setTimeout(r, 1500));
-        const check = await getRentalStatus(data.rental.id);
-        if (check && check.success && check.rental && check.rental.phone_number) {
-          data.rental = check.rental;
-          console.log(`[OTP Service] Đã nhận được SĐT: ${data.rental.phone_number}`);
-          break;
-        }
-      }
-    }
-
-    return data;
+    // Trả kết quả ngay khi có rental ID. Việc cấp số được polling nền,
+    // không giữ request của khách trong vòng đợi 9 giây.
+    return normalizeResponse(await res.json());
   } catch (error) {
     console.error("❌ Lỗi gọi rentOtp:", error.message);
     return { success: false, error: error.message };
@@ -126,7 +136,7 @@ async function cancelRental(rentalId) {
       body: new URLSearchParams({ rental_id: String(rentalId) }).toString(),
     });
     const data = await res.json();
-    return { ...data, httpStatus: res.status };
+    return { ...normalizeResponse(data), httpStatus: res.status };
   } catch (error) {
     console.error(`❌ Lỗi gọi cancelRental (${rentalId}):`, error.message);
     return { success: false, canceled: false, error: error.message };
@@ -146,7 +156,7 @@ async function getRentalStatus(rentalId) {
     });
 
     const data = await res.json();
-    return data;
+    return normalizeResponse(data);
   } catch (error) {
     console.error(`❌ Lỗi gọi getRentalStatus (${rentalId}):`, error.message);
     return { success: false, error: error.message };
@@ -159,4 +169,6 @@ module.exports = {
   rentOtp,
   cancelRental,
   getRentalStatus,
+  normalizeRental,
+  normalizeResponse,
 };

@@ -11,7 +11,8 @@ function formatMoney(n) {
 }
 
 /**
- * Bắt đầu polling tự động kiểm tra mã OTP mỗi 2.5 - 3 giây
+ * Bắt đầu polling tự động kiểm tra số/OTP. Số được cấp sau rental ID
+ * cũng được gửi ngay cho khách, không làm mất lượt thuê.
  */
 function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, meta = {}) {
   stopRentalPolling(orderId);
@@ -22,6 +23,11 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
     : config.OTP_TIMEOUT_SECONDS * 1000;
 
   console.log(`[RentalManager] Bắt đầu polling đơn ${orderId} (Rental ID: ${rentalId}, Timeout: ${Math.round(timeoutMs / 1000)}s)`);
+
+  const pollIntervalMs = Math.max(1000, Number(config.OTP_POLL_INTERVAL_MS) || 1500);
+  const countdownUpdateMs = Math.max(5000, (Number(config.OTP_COUNTDOWN_UPDATE_SECONDS) || 15) * 1000);
+  let lastCountdownUpdateAt = 0;
+  let phoneNotified = !meta.pendingPhoneNotification;
 
   const pollInterval = setInterval(async () => {
     const session = activePollers.get(orderId);
@@ -42,26 +48,16 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
           });
         } catch {}
       }
-      await handleTimeoutOrCancel(bot, orderId, "Quá thời gian chờ nhận mã (Timeout 4 phút)");
+      await handleTimeoutOrCancel(
+        bot,
+        orderId,
+        `Quá thời gian chờ nhận mã (Timeout ${Math.ceil(config.OTP_TIMEOUT_SECONDS / 60)} phút)`
+      );
       return;
     }
 
     const elapsed = Date.now() - startTime;
     const remainingSeconds = Math.max(0, Math.ceil((timeoutMs - elapsed) / 1000));
-
-    // Cập nhật nút đếm ngược thời gian (theo giây)
-    if (meta?.chatId && meta?.messageId && remainingSeconds > 0) {
-      try {
-        await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
-          inline_keyboard: [
-            [{ text: otpCountdownButtonLabel(remainingSeconds), callback_data: `CHECK_OTP:${orderId}` }],
-            ...(session.serverId === "2"
-              ? [[{ text: "🛑 Hủy thuê số & hoàn tiền", callback_data: `CANCEL_OTP:${orderId}` }]]
-              : []),
-          ],
-        });
-      } catch {}
-    }
 
     // Không gọi API nhà cung cấp chồng lên nhau nếu một request bị chậm.
     if (session.polling) return;
@@ -70,9 +66,29 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
       const res = await otpService.getRentalStatus(rentalId);
       if (res && res.success && res.rental) {
         const rental = res.rental;
+        const phoneNumber = rental.phone_number;
         const otpCode = rental.otp_code || rental.otp || rental.code;
 
-        if (otpCode) {
+        if (phoneNumber && !phoneNotified) {
+          await db.updateOrderStatus(orderId, { phoneNumber });
+          try {
+            await bot.telegram.sendMessage(
+              telegramId,
+              `📞 <b>SỐ ĐIỆN THOẠI ĐÃ SẴN SÀNG</b>\n` +
+              `━━━━━━━━━━━━━━━━━━━━\n` +
+              `📱 <b>Số điện thoại:</b> <code>${String(phoneNumber).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>\n` +
+              `Hãy dùng số này để đăng ký/đăng nhập Shopee.`,
+              { parse_mode: "HTML" }
+            );
+            phoneNotified = true;
+          } catch (error) {
+            console.error(`[RentalManager] Không thể gửi số cho UID ${telegramId}:`, error.message);
+          }
+        }
+
+        // Chỉ hoàn tất khi đã có cả OTP và số điện thoại; tránh gửi mã
+        // cho khách nhưng thiếu số do payload nhà cung cấp trả không đồng bộ.
+        if (otpCode && phoneNumber) {
           console.log(`[RentalManager] 🎉 Đơn ${orderId} nhận được OTP: ${otpCode}`);
           clearInterval(pollInterval);
           activePollers.delete(orderId);
@@ -81,6 +97,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
           await db.updateOrderStatus(orderId, {
             status: "COMPLETED",
             otpCode,
+            phoneNumber,
           });
 
           // 2. Cập nhật nút tin nhắn gốc
@@ -97,7 +114,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
             telegramId,
             `🎉 <b>ĐÃ TỰ ĐỘNG NHẬN ĐƯỢC MÃ OTP!</b>\n` +
             `━━━━━━━━━━━━━━━━━━━━\n` +
-            `📱 <b>Số điện thoại:</b> <code>${rental.phone_number || "—"}</code>\n` +
+            `📱 <b>Số điện thoại:</b> <code>${phoneNumber || "—"}</code>\n` +
             `🔑 <b>MÃ OTP:</b> <code>${otpCode}</code> <i>(Chạm để sao chép)</i>\n` +
             `📦 <b>Dịch vụ:</b> Shopee\n` +
             `🧾 <b>Mã đơn:</b> <code>${orderId}</code>\n` +
@@ -105,11 +122,27 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
             `Đơn đã hoàn thành tự động. Cảm ơn bạn đã sử dụng dịch vụ! 🙏`,
             { parse_mode: "HTML" }
           );
-        } else if (rental.status === "cancelled" || rental.status === "expired") {
+        } else if (["cancelled", "canceled", "expired", "failed"].includes(String(rental.status || "").toLowerCase())) {
           clearInterval(pollInterval);
           activePollers.delete(orderId);
           await handleTimeoutOrCancel(bot, orderId, "Nhà cung cấp đã hủy hoặc hết hạn số");
         }
+      }
+
+      // Cập nhật countdown thưa hơn để không làm nghẽn Telegram API;
+      // việc kiểm tra số/OTP vẫn chạy ở mỗi nhịp polling.
+      if (activePollers.has(orderId) && meta?.chatId && meta?.messageId && remainingSeconds > 0 && Date.now() - lastCountdownUpdateAt >= countdownUpdateMs) {
+        lastCountdownUpdateAt = Date.now();
+        try {
+          await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
+            inline_keyboard: [
+              [{ text: otpCountdownButtonLabel(remainingSeconds), callback_data: `CHECK_OTP:${orderId}` }],
+              ...(session.serverId === "2"
+                ? [[{ text: "🛑 Hủy thuê số & hoàn tiền", callback_data: `CANCEL_OTP:${orderId}` }]]
+                : []),
+            ],
+          });
+        } catch {}
       }
     } catch (err) {
       console.error(`[RentalManager] Lỗi polling đơn ${orderId}:`, err.message);
@@ -117,7 +150,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
       const currentSession = activePollers.get(orderId);
       if (currentSession === session) currentSession.polling = false;
     }
-  }, 2500);
+  }, pollIntervalMs);
 
   activePollers.set(orderId, {
     interval: pollInterval,
@@ -164,20 +197,23 @@ async function checkOtpManually(bot, orderId, requesterId = null) {
   }
 
   const res = await otpService.getRentalStatus(order.rental_id);
-  if (res && res.success && res.rental && res.rental.otp_code) {
-    const otpCode = res.rental.otp_code;
+  const rental = res?.rental;
+  const otpCode = rental?.otp_code || rental?.otp || rental?.code;
+  const phoneNumber = rental?.phone_number || (order.phone_number !== "Đang cấp số" ? order.phone_number : "");
+  if (res && res.success && rental && otpCode && phoneNumber) {
     stopRentalPolling(orderId);
 
     await db.updateOrderStatus(orderId, {
       status: "COMPLETED",
       otpCode,
+      phoneNumber,
     });
 
     await bot.telegram.sendMessage(
       order.telegram_id,
       `🎉 <b>ĐÃ NHẬN ĐƯỢC MÃ OTP!</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📱 <b>Số điện thoại:</b> <code>${order.phone_number}</code>\n` +
+      `📱 <b>Số điện thoại:</b> <code>${phoneNumber}</code>\n` +
       `🔑 <b>MÃ OTP:</b> <code>${otpCode}</code> <i>(Chạm để sao chép)</i>\n` +
       `📦 <b>Dịch vụ:</b> Shopee\n` +
       `🧾 <b>Mã đơn:</b> <code>${orderId}</code>\n` +
@@ -186,7 +222,7 @@ async function checkOtpManually(bot, orderId, requesterId = null) {
       { parse_mode: "HTML" }
     );
 
-    return { success: true, hasOtp: true, otpCode, phoneNumber: order.phone_number };
+    return { success: true, hasOtp: true, otpCode, phoneNumber };
   }
 
   return { success: true, hasOtp: false, message: "Hệ thống vẫn đang chờ mã từ Shopee..." };

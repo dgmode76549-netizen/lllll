@@ -1,6 +1,6 @@
 const DEFAULT_WINDOW_MS = 10 * 1000;
 const DEFAULT_MAX_REQUESTS = 8;
-const DEFAULT_BLOCK_MS = 30 * 1000;
+const DEFAULT_BLOCK_MS = 2 * 60 * 1000;
 const DEFAULT_MAX_CONCURRENT = 2;
 const DEFAULT_MAX_TRACKED_USERS = 10000;
 
@@ -54,7 +54,8 @@ function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs, ma
     if (state.blockedUntil > now) {
       if (!state.warningSent) {
         state.warningSent = true;
-        await notifyBlocked(ctx, "🚫 Bạn thao tác quá nhanh. Vui lòng chờ vài giây rồi thử lại.");
+        const remainingSeconds = Math.max(1, Math.ceil((state.blockedUntil - now) / 1000));
+        await notifyBlocked(ctx, `🚫 Phát hiện thao tác liên tục. Bot tạm khóa ${Math.ceil(remainingSeconds / 60)} phút để chống spam.`);
       }
       users.set(userId, state);
       return;
@@ -75,8 +76,8 @@ function createAntiSpamMiddleware({ isExempt, windowMs, maxRequests, blockMs, ma
       state.warningSent = true;
       users.set(userId, state);
 
-      const blockSeconds = Math.ceil(blockDurationMs / 1000);
-      await notifyBlocked(ctx, `⚠️ Bạn thao tác quá liên tục. Bot tạm ngừng xử lý trong ${blockSeconds} giây để chống spam.`);
+      const blockMinutes = Math.max(1, Math.ceil(blockDurationMs / 60000));
+      await notifyBlocked(ctx, `⚠️ Bạn thao tác quá liên tục. Bot tạm ngừng xử lý trong ${blockMinutes} phút để chống spam.`);
       return;
     }
 

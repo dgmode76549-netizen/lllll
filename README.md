@@ -5,7 +5,7 @@ Hệ thống Telegram Bot tự động hóa dịch vụ thuê OTP Shopee (giá c
 ---
 
 ## 🌟 Tính Năng Nổi Bật
-- **📱 Thuê OTP Shopee Tự Động**: Khi bấm thuê, người dùng chọn SV1 hoặc SV2, xem danh mục sản phẩm cập nhật từ nhà cung cấp, sau đó bot trừ ví, cấp SĐT và tự động lắng nghe mã OTP (mỗi 2.5s).
+- **📱 Thuê OTP Shopee Tự Động**: Khi bấm thuê, người dùng chọn SV1 hoặc SV2, xem danh mục sản phẩm cập nhật từ nhà cung cấp, sau đó bot trừ ví, cấp SĐT và tự động lắng nghe mã OTP (mỗi 1.5s). Nếu nhà cung cấp trả rental ID trước, bot phản hồi ngay và gửi SĐT ngay khi được cấp.
 - **⏱️ Đếm Ngược & Hoàn Tiền Tự Động**: Nút lấy OTP đếm ngược 4 phút (240s). Nếu hết giờ không có mã OTP, bot tự động hoàn lại 5.000đ về ví khách hàng.
 - **💳 Nạp Tiền VietQR Tự Động (Casso)**: Tạo mã QR nạp tiền MBBank với mã định danh ngẫu nhiên duy nhất, hiệu lực trong 10 phút. Quá 10 phút tự động hủy lệnh.
 - **🌐 Webhook Vercel Tích Hợp**: Có sẵn module webhook serverless trong thư mục `casso-vercel/` để nhận biến động số dư từ Casso.
@@ -36,7 +36,7 @@ tg-bot/
     │   └── supabase.js         <-- Tương tác Supabase & fallback
     ├── services/
     │   ├── otpService.js       <-- Tích hợp API shopitool (rent, status, balance)
-    │   ├── rentalManager.js    <-- Polling OTP, countdown 240s, hoàn tiền
+    │   ├── rentalManager.js    <-- Polling số/OTP, countdown, hoàn tiền
     │   ├── cassoWatcher.js     <-- Quét giao dịch Supabase, xóa đơn quá 10p
     │   └── paymentService.js   <-- Tạo VietQR MBBank
     ├── keyboards/

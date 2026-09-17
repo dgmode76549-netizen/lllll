@@ -125,7 +125,13 @@ function registerAdminHandler(bot) {
   bot.hears("➕ Thêm sản phẩm acc", async (ctx) => {
     if (!requireAdmin(ctx)) return;
     adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_NAME" });
-    return ctx.reply("1️⃣ Gửi tên sản phẩm, ví dụ: <b>GG AI Pro 18 tháng</b>", { parse_mode: "HTML" });
+    return ctx.reply(
+      "➕ <b>THÊM SẢN PHẨM MỚI</b>\n" +
+      "━━━━━━━━━━━━━━━━━━━━\n" +
+      "Gửi lần lượt tên, giá, mô tả và link kho đầu tiên.\n" +
+      "Gõ <code>hủy</code> bất cứ lúc nào để thoát.",
+      { parse_mode: "HTML", ...accountAdminMenu() }
+    );
   });
 
   bot.hears("➕ Nhập thêm link kho", async (ctx) => {
@@ -256,21 +262,24 @@ function registerAdminHandler(bot) {
     }
 
     if (st.step === "ACCOUNT_ADD_NAME") {
-      if (text.length < 2) return ctx.reply("❌ Tên sản phẩm quá ngắn. Vui lòng gửi lại.");
+      if (text.length < 2 || text.length > 100) return ctx.reply("❌ Tên sản phẩm phải từ 2 đến 100 ký tự. Vui lòng gửi lại.");
       adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_PRICE", name: text });
-    return ctx.reply("2️⃣ Gửi giá bán bằng VNĐ, ví dụ: <code>60000</code>", { parse_mode: "HTML" });
+      return ctx.reply("2️⃣ Gửi giá bán VNĐ, ví dụ <code>60000</code> hoặc <code>60k</code>.", { parse_mode: "HTML" });
     }
 
     if (st.step === "ACCOUNT_ADD_PRICE") {
-      const price = Number(text.replace(/\s/g, "").replace(/k$/i, "000").replace(/[.,]/g, ""));
-      if (!Number.isFinite(price) || price < 0) return ctx.reply("❌ Giá không hợp lệ. Hãy gửi số tiền, ví dụ 60000.");
+      const priceText = text.replace(/\s/g, "").toLowerCase();
+      const price = /^\d+(?:k|\.000)?$/.test(priceText)
+        ? Number(priceText.replace(/k$/, "000").replace(/\.000$/, "000"))
+        : Number(priceText.replace(/[.,]/g, ""));
+      if (!Number.isFinite(price) || price < 0 || price > 2_000_000_000) return ctx.reply("❌ Giá không hợp lệ. Hãy gửi số tiền, ví dụ 60000.");
       adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_DESC", name: st.name, price });
-      return ctx.reply("3️⃣ Gửi mô tả sản phẩm (hoặc gửi <code>-</code> để bỏ qua).", { parse_mode: "HTML" });
+      return ctx.reply("3️⃣ Gửi mô tả sản phẩm (hoặc gửi <code>-</code> để bỏ qua). Có thể nhập nhiều dòng.", { parse_mode: "HTML" });
     }
 
     if (st.step === "ACCOUNT_ADD_DESC") {
       adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_STOCK", name: st.name, price: st.price, description: text === "-" ? "" : text });
-      return ctx.reply("4️⃣ Gửi link/nội dung đầu tiên đưa vào kho. Link này sẽ giao cho khách đầu tiên mua.");
+      return ctx.reply("4️⃣ Gửi link/nội dung đầu tiên đưa vào kho. Gửi <code>-</code> nếu muốn tạo sản phẩm trước rồi nhập kho sau.", { parse_mode: "HTML" });
     }
 
     if (st.step === "ACCOUNT_ADD_STOCK") {
@@ -278,9 +287,13 @@ function registerAdminHandler(bot) {
       const productId = `acc-${Date.now()}`;
       const product = await db.createAccountProduct({ id: productId, name: st.name, price: st.price, description: st.description });
       if (!product) return ctx.reply("❌ Không thể tạo sản phẩm. Kiểm tra kết nối Supabase rồi thử lại.", { ...accountAdminMenu() });
+      if (text === "-") return ctx.reply(`✅ Đã tạo sản phẩm mới.\n🆔 ID: <code>${escapeHtml(productId)}</code>\n\nDùng nút <b>➕ Nhập thêm link kho</b> để bổ sung hàng.`, { parse_mode: "HTML", ...accountAdminMenu() });
       const stock = await db.addAccountInventory(productId, text, ctx.from.id);
-      if (!stock) return ctx.reply("⚠️ Đã tạo sản phẩm nhưng chưa nhập được link kho. Bạn có thể dùng nút nhập thêm link.", { ...accountAdminMenu() });
-      return ctx.reply(`✅ Đã thêm sản phẩm và 1 link vào kho.\n🆔 ID: <code>${escapeHtml(productId)}</code>`, { parse_mode: "HTML", ...accountAdminMenu() });
+      if (!stock) {
+        await db.deleteAccountProduct(productId);
+        return ctx.reply("❌ Không thể nhập link kho nên sản phẩm chưa được lưu. Vui lòng thực hiện lại.", { ...accountAdminMenu() });
+      }
+      return ctx.reply(`✅ <b>Đã thêm sản phẩm mới</b> và 1 link vào kho.\n🆔 ID: <code>${escapeHtml(productId)}</code>`, { parse_mode: "HTML", ...accountAdminMenu() });
     }
 
     if (st.step === "ACCOUNT_STOCK_PRODUCT") {

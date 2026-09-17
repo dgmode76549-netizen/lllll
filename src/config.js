@@ -14,8 +14,9 @@ function loadSettings() {
   }
   return {
     sosText: "🆘 Hỗ trợ: Nhắn admin để được hỗ trợ.",
-    supportUsername: "@chuataydau369",
-    supportLink: "https://t.me/chuataydau369",
+    supportUsername: "@cskhthuesogiare",
+    supportUsernames: ["@cskhthuesogiare", "@thuesogiare2cskh"],
+    supportLink: "https://t.me/cskhthuesogiare",
   };
 }
 
@@ -41,12 +42,14 @@ const config = {
   OTP_PRICE_VND: 5000,
   OTP_TIMEOUT_SECONDS: Number(process.env.OTP_TIMEOUT_SECONDS) || 240,
   OTP_REQUEST_TIMEOUT_MS: Number(process.env.OTP_REQUEST_TIMEOUT_MS) || 15000,
+  OTP_POLL_INTERVAL_MS: Number(process.env.OTP_POLL_INTERVAL_MS) || 1500,
+  OTP_COUNTDOWN_UPDATE_SECONDS: Number(process.env.OTP_COUNTDOWN_UPDATE_SECONDS) || 15,
   ACCOUNT_DEFAULT_PRICE_VND: Number(process.env.ACCOUNT_DEFAULT_PRICE_VND) || 60000,
 
   // Chống spam Telegram
   SPAM_WINDOW_SECONDS: Number(process.env.SPAM_WINDOW_SECONDS) || 10,
   SPAM_MAX_REQUESTS: Number(process.env.SPAM_MAX_REQUESTS) || 8,
-  SPAM_BLOCK_SECONDS: Number(process.env.SPAM_BLOCK_SECONDS) || 30,
+  SPAM_BLOCK_SECONDS: Number(process.env.SPAM_BLOCK_SECONDS) || 120,
   SPAM_MAX_CONCURRENT: Number(process.env.SPAM_MAX_CONCURRENT) || 2,
   SPAM_MAX_TRACKED_USERS: Number(process.env.SPAM_MAX_TRACKED_USERS) || 10000,
 

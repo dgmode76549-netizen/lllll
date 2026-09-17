@@ -46,11 +46,12 @@ function registerStartHandler(bot) {
 
   // Xem thông tin tài khoản
   bot.hears("👤 Tài khoản", async (ctx) => {
-    const user = await db.getUser(ctx.from.id);
+    const [user, successfulOrders] = await Promise.all([
+      db.getUser(ctx.from.id),
+      db.getUserSuccessfulOrders(ctx.from.id, 100),
+    ]);
     const balance = user ? user.balance : 0;
     const totalDeposited = user ? user.total_deposited : 0;
-
-    const successfulOrders = await db.getUserSuccessfulOrders(ctx.from.id, 100);
     const completedCount = successfulOrders ? successfulOrders.length : 0;
 
     const name = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ").trim();
@@ -76,11 +77,14 @@ function registerStartHandler(bot) {
   // Hỗ trợ
   bot.hears("🆘 Hỗ trợ", async (ctx) => {
     const s = config.settings;
+    const supportUsernames = Array.isArray(s.supportUsernames) && s.supportUsernames.length
+      ? s.supportUsernames
+      : [s.supportUsername || "@cskhthuesogiare"];
     const supportMsg =
       `🆘 <b>TRUNG TÂM HỖ TRỢ</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `${s.sosText || "Nếu gặp bất kỳ vấn đề gì về nạp tiền hoặc nhận mã, vui lòng liên hệ Admin:"}\n\n` +
-      `👤 <b>Telegram Admin:</b> ${s.supportUsername || "@chuataydau369"}\n` +
+      `👤 <b>Telegram CSKH:</b> ${supportUsernames.join(" • ")}\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7!`;
 

@@ -55,8 +55,8 @@ function registerAccountHandler(bot) {
 
   bot.action(/^ACCOUNT_PRODUCT:(.+)$/, async (ctx) => {
     const productId = decodeURIComponent(ctx.match[1]);
-    const product = await db.getAccountProduct(productId);
     await ctx.answerCbQuery();
+    const product = await db.getAccountProduct(productId);
     if (!product) return ctx.reply("❌ Sản phẩm không còn tồn tại.", { ...mainMenu(ctx.from.id) });
 
     const message =

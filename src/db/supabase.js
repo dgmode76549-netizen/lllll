@@ -311,6 +311,7 @@ async function updateOrderStatus(orderId, updates) {
   };
   if (updates.status) payload.status = updates.status;
   if (updates.otpCode) payload.otp_code = updates.otpCode;
+  if (updates.phoneNumber) payload.phone_number = updates.phoneNumber;
   if (updates.expiresAt) payload.expires_at = updates.expiresAt;
 
   if (supabase) {
@@ -501,9 +502,13 @@ async function getAccountProduct(productId) {
 }
 
 async function createAccountProduct({ id, name, description, price, active = true, deliveryType = "link" }) {
+  const productId = String(id || "").trim();
+  const productName = String(name || "").trim();
+  const productPrice = Number(price);
+  if (!productId || !productName || !Number.isFinite(productPrice) || productPrice < 0) return null;
   const record = {
-    id: String(id), name: String(name).trim(), description: String(description || "").trim(),
-    price: Number(price), active: Boolean(active), delivery_type: deliveryType, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    id: productId, name: productName, description: String(description || "").trim(),
+    price: productPrice, active: Boolean(active), delivery_type: deliveryType, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   };
   if (supabase) {
     try {
@@ -524,8 +529,10 @@ async function createAccountProduct({ id, name, description, price, active = tru
 }
 
 async function addAccountInventory(productId, content, addedBy = null) {
+  const inventoryContent = String(content || "").trim();
+  if (!String(productId || "").trim() || !inventoryContent) return null;
   const record = {
-    product_id: String(productId), content: String(content).trim(), status: "AVAILABLE", added_by: addedBy ? Number(addedBy) : null,
+    product_id: String(productId).trim(), content: inventoryContent, status: "AVAILABLE", added_by: addedBy ? Number(addedBy) : null,
     created_at: new Date().toISOString(),
   };
   if (supabase) {
@@ -545,6 +552,30 @@ async function addAccountInventory(productId, content, addedBy = null) {
   fdb.accountInventory[id] = { id, ...record };
   saveFallbackDb(fdb);
   return fdb.accountInventory[id];
+}
+
+async function deleteAccountProduct(productId) {
+  const id = String(productId || "").trim();
+  if (!id) return false;
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("account_products").delete().eq("id", id);
+      if (!error) return true;
+      console.error("Supabase deleteAccountProduct error:", error.message);
+      return false;
+    } catch (e) {
+      console.error("Supabase deleteAccountProduct catch:", e.message);
+      return false;
+    }
+  }
+  const fdb = loadFallbackDb();
+  if (!fdb.accountProducts?.[id]) return false;
+  delete fdb.accountProducts[id];
+  for (const [inventoryId, item] of Object.entries(fdb.accountInventory || {})) {
+    if (String(item.product_id) === id) delete fdb.accountInventory[inventoryId];
+  }
+  saveFallbackDb(fdb);
+  return true;
 }
 
 function parseRpcPurchase(data) {
@@ -920,6 +951,7 @@ module.exports = {
   getAccountProduct,
   createAccountProduct,
   addAccountInventory,
+  deleteAccountProduct,
   purchaseAccountProduct,
   createAccountOrder,
   getUserAccountOrders,

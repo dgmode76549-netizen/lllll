@@ -109,7 +109,6 @@ function registerOtpHandler(bot) {
 
   async function rentSelectedProduct(ctx, serverId, encodedProductId) {
     const from = ctx.from;
-    let waitMsg = null;
     let charged = false;
     let orderCreated = false;
     let createdOrderId = null;
@@ -154,32 +153,20 @@ function registerOtpHandler(bot) {
       );
     }
 
-    // 2. Thông báo đang xử lý
-    waitMsg = await ctx.reply("⏳ <i>Đang kết nối nhà mạng để lấy số điện thoại Shopee... Vui lòng đợi trong giây lát.</i>", {
-      parse_mode: "HTML",
-    });
-
-    // 3. Tạm trừ tiền
+    // 2. Tạm trừ tiền
     const deductRes = await db.changeUserBalance(from.id, -price);
     if (!deductRes.success) {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
-      } catch {}
       return ctx.reply("❌ Không thể trừ tiền ví: " + (deductRes.error || "Lỗi giao dịch"));
     }
     charged = true;
 
-    // 4. Gọi API nhà cung cấp SIM
+    // 3. Gọi API nhà cung cấp SIM
     const rentRes = await otpService.rentOtp({ serverId, productId });
 
-    if (!rentRes || !rentRes.success || !rentRes.rental || !rentRes.rental.phone_number) {
-      // Hoàn tiền ngay lập tức nếu API lỗi hoặc hết số
+    if (!rentRes || !rentRes.success || !rentRes.rental || !rentRes.rental.id) {
+      // Hoàn tiền ngay lập tức nếu API lỗi hoặc không tạo được rental.
       const refundRes = await db.changeUserBalance(from.id, price);
       charged = !refundRes.success;
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
-      } catch {}
-
       const errorDetail = rentRes?.error || rentRes?.message || `Kho số ${serviceName} đang tạm hết hoặc bảo trì`;
       return ctx.reply(
         `❌ <b>KHÔNG THỂ LẤY SỐ ĐIỆN THOẠI!</b>\n` +
@@ -192,7 +179,8 @@ function registerOtpHandler(bot) {
       );
     }
 
-    // 5. Thuê thành công, tạo đơn hàng
+    // 4. Thuê thành công, tạo đơn hàng. Một số nhà cung cấp cấp rental ID
+    // trước rồi mới trả phone_number; khi đó polling nền sẽ cập nhật số.
     rental = rentRes.rental;
     const orderId = generateOrderId();
     const providerExpiresAt = new Date(rental.expires_at || "");
@@ -204,7 +192,7 @@ function registerOtpHandler(bot) {
     await db.createOrder({
       id: orderId,
       telegramId: from.id,
-      phoneNumber: rental.phone_number,
+      phoneNumber: rental.phone_number || "Đang cấp số",
       rentalId: rental.id,
       amount: price,
       status: "PENDING",
@@ -215,15 +203,15 @@ function registerOtpHandler(bot) {
     orderCreated = true;
     createdOrderId = orderId;
 
-    try {
-      await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
-    } catch {}
+    const phoneText = rental.phone_number
+      ? `📞 <b>Số điện thoại:</b> <code>${escapeHtml(rental.phone_number)}</code> <i>(Chạm để sao chép)</i>`
+      : "⏳ <b>Số điện thoại:</b> Nhà mạng đang cấp số, bot sẽ gửi ngay khi có số";
 
-    // Gửi thông tin SĐT cho khách
+    // Gửi phản hồi ngay, không chờ vòng lấy số đồng bộ.
     const sentMsg = await ctx.reply(
       `📱 <b>THUÊ SỐ ${displayServiceName.toUpperCase()} THÀNH CÔNG!</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📞 <b>Số điện thoại:</b> <code>${rental.phone_number}</code> <i>(Chạm để sao chép)</i>\n` +
+      `${phoneText}\n` +
       `📦 <b>Dịch vụ:</b> ${displayServiceName}\n` +
       `💵 <b>Giá thuê:</b> ${formatMoney(price)}đ\n` +
       `⏱️ <b>Thời gian còn lại:</b> <code>${formatCountdown(config.OTP_TIMEOUT_SECONDS)}</code>\n` +
@@ -235,18 +223,22 @@ function registerOtpHandler(bot) {
       }
     );
 
-    // 6. Kích hoạt background polling tự động mỗi 2.5 giây
+    // 5. Kích hoạt polling nền tự động
     rentalManager.startRentalPolling(bot, orderId, rental.id, from.id, expiresAt.getTime(), {
       chatId: ctx.chat.id,
       messageId: sentMsg.message_id,
       serverId,
+      pendingPhoneNotification: !rental.phone_number,
     });
     } catch (err) {
       console.error(`[OTP Handler] Lỗi thuê số cho UID ${from?.id}:`, err.message);
 
       if (orderCreated && createdOrderId && rental?.id) {
         // Đã tạo đơn thì giữ tiền và tiếp tục theo dõi, kể cả khi gửi tin nhắn bị lỗi.
-        rentalManager.startRentalPolling(bot, createdOrderId, rental.id, from.id, createdExpiresAtMs, { serverId });
+        rentalManager.startRentalPolling(bot, createdOrderId, rental.id, from.id, createdExpiresAtMs, {
+          serverId,
+          pendingPhoneNotification: !rental.phone_number,
+        });
         try {
           return await ctx.reply("✅ Đơn thuê đã được tạo. Hệ thống vẫn đang tự động chờ mã OTP cho bạn.");
         } catch {}
@@ -257,12 +249,6 @@ function registerOtpHandler(bot) {
         const refundRes = await db.changeUserBalance(from.id, config.OTP_PRICE_VND);
         if (refundRes.success) charged = false;
       }
-      if (waitMsg?.message_id) {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
-        } catch {}
-      }
-
       const refundText = charged
         ? "Vui lòng liên hệ admin để kiểm tra giao dịch hoàn tiền."
         : `Hệ thống đã hoàn lại ${formatMoney(config.OTP_PRICE_VND)}đ vào ví của bạn.`;
