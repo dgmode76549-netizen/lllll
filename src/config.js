@@ -41,6 +41,7 @@ const config = {
   // Giá bán OTP cố định cho mọi server và mọi sản phẩm.
   OTP_PRICE_VND: 5000,
   OTP_TIMEOUT_SECONDS: Number(process.env.OTP_TIMEOUT_SECONDS) || 240,
+  OTP_PHONE_TIMEOUT_SECONDS: Number(process.env.OTP_PHONE_TIMEOUT_SECONDS) || 30,
   OTP_REQUEST_TIMEOUT_MS: Number(process.env.OTP_REQUEST_TIMEOUT_MS) || 15000,
   OTP_POLL_INTERVAL_MS: Number(process.env.OTP_POLL_INTERVAL_MS) || 1500,
   OTP_COUNTDOWN_UPDATE_SECONDS: Number(process.env.OTP_COUNTDOWN_UPDATE_SECONDS) || 15,

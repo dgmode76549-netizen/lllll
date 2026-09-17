@@ -26,6 +26,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
 
   const pollIntervalMs = Math.max(1000, Number(config.OTP_POLL_INTERVAL_MS) || 1500);
   const countdownUpdateMs = Math.max(5000, (Number(config.OTP_COUNTDOWN_UPDATE_SECONDS) || 15) * 1000);
+  const phoneAllocationTimeoutMs = Math.max(10000, (Number(config.OTP_PHONE_TIMEOUT_SECONDS) || 30) * 1000);
   let lastCountdownUpdateAt = 0;
   let phoneNotified = !meta.pendingPhoneNotification;
 
@@ -52,6 +53,40 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
         bot,
         orderId,
         `Quá thời gian chờ nhận mã (Timeout ${Math.ceil(config.OTP_TIMEOUT_SECONDS / 60)} phút)`
+      );
+      return;
+    }
+
+    // Không để đơn treo vô thời hạn ở trạng thái "đang cấp số".
+    // Hoàn tiền sau ngưỡng riêng, ngắn hơn thời gian chờ OTP tổng.
+    if (!phoneNotified && Date.now() - startTime >= phoneAllocationTimeoutMs) {
+      console.log(`[RentalManager] Đơn ${orderId} bị treo khi cấp số, tiến hành hoàn tiền.`);
+      clearInterval(pollInterval);
+      activePollers.delete(orderId);
+
+      // Endpoint hủy hiện được nhà cung cấp hỗ trợ cho SV2.
+      if (String(meta.serverId || config.OTP_SERVER_ID || "1") === "2") {
+        try {
+          const cancelResult = await otpService.cancelRental(rentalId);
+          if (!cancelResult?.success || !cancelResult?.canceled) {
+            console.warn(`[RentalManager] Không hủy được rental ${rentalId} trước khi hoàn tiền.`);
+          }
+        } catch (error) {
+          console.warn(`[RentalManager] Lỗi hủy rental ${rentalId}:`, error.message);
+        }
+      }
+
+      if (meta?.chatId && meta?.messageId) {
+        try {
+          await bot.telegram.editMessageReplyMarkup(meta.chatId, meta.messageId, undefined, {
+            inline_keyboard: [[{ text: "💸 KHÔNG CÓ SỐ — ĐÃ HOÀN TIỀN", callback_data: "NOP" }]],
+          });
+        } catch {}
+      }
+      await handleTimeoutOrCancel(
+        bot,
+        orderId,
+        `Nhà cung cấp bị treo khi cấp số quá ${Math.ceil(phoneAllocationTimeoutMs / 1000)} giây`
       );
       return;
     }
