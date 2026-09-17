@@ -187,7 +187,7 @@ function registerAdminHandler(bot) {
     const products = await db.getAccountProducts(true);
     const list = products.map((p) => `<code>${escapeHtml(p.id)}</code> — ${escapeHtml(p.name)}`).join("\n");
     adminStates.set(ctx.from.id, { step: "ACCOUNT_STOCK_PRODUCT" });
-    return ctx.reply(`Gửi <b>ID sản phẩm</b> cần nhập link:\n\n${list || "Chưa có sản phẩm"}`, { parse_mode: "HTML" });
+    return ctx.reply(`Gửi <b>ID sản phẩm</b> cần nhập nội dung kho:\n\n${list || "Chưa có sản phẩm"}`, { parse_mode: "HTML", ...accountAdminMenu() });
   });
 
   bot.hears(["📦 Xem kho", "📦 Xem kho acc"], async (ctx) => {
@@ -327,7 +327,7 @@ function registerAdminHandler(bot) {
 
     if (st.step === "ACCOUNT_ADD_DESC") {
       adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_STOCK", name: st.name, price: st.price, description: text === "-" ? "" : text });
-      return ctx.reply("4️⃣ Gửi link/nội dung đầu tiên đưa vào kho. Gửi <code>-</code> nếu muốn tạo sản phẩm trước rồi nhập kho sau.", { parse_mode: "HTML" });
+      return ctx.reply("4️⃣ Gửi nội dung đầu tiên đưa vào kho (tài khoản, key, mã kích hoạt...). Gửi <code>-</code> nếu muốn tạo sản phẩm trước rồi nhập kho sau.", { parse_mode: "HTML" });
     }
 
     if (st.step === "ACCOUNT_ADD_STOCK") {
@@ -348,7 +348,7 @@ function registerAdminHandler(bot) {
       const product = await db.getAccountProduct(text);
       if (!product) return ctx.reply("❌ Không tìm thấy ID sản phẩm. Gửi lại hoặc gõ cancel.");
       adminStates.set(ctx.from.id, { step: "ACCOUNT_STOCK_VALUE", productId: product.id, productName: product.name });
-      return ctx.reply(`Gửi link/nội dung kho cho <b>${escapeHtml(product.name)}</b>:`, { parse_mode: "HTML" });
+      return ctx.reply(`Gửi nội dung kho cho <b>${escapeHtml(product.name)}</b> (tài khoản, key, mã kích hoạt...):`, { parse_mode: "HTML" });
     }
 
     if (st.step === "ACCOUNT_DELETE_PRODUCT") {

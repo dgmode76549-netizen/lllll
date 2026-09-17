@@ -29,7 +29,7 @@ async function showAccountProducts(ctx, edit = false) {
     `🛒 <b>KHO MUA ACC</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `Chọn sản phẩm muốn mua. Hệ thống giao link ngay sau khi thanh toán bằng số dư.\n` +
-    `💡 Nếu sản phẩm hết hàng, admin sẽ bổ sung link vào kho.`;
+    `💡 Nếu sản phẩm hết hàng, admin sẽ bổ sung nội dung vào kho.`;
   const options = { parse_mode: "HTML", ...accountProductSelectionKeyboard(products) };
   if (edit) {
     try { return await ctx.editMessageText(message, options); } catch {}

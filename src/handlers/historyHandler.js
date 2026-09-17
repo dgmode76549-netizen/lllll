@@ -57,7 +57,7 @@ function registerHistoryHandler(bot) {
           `<b>#${index + 1}. Mua acc:</b> <code>${escapeHtml(o.id)}</code>\n` +
           `📦 <b>Sản phẩm:</b> ${escapeHtml(o.product_name)}\n` +
           `💵 <b>Thanh toán:</b> ${Number(o.amount || 0).toLocaleString("vi-VN")}đ\n` +
-          `🔗 <b>Link đã nhận:</b> ${escapeHtml(o.delivery_content)}\n` +
+          `📦 <b>Nội dung đã nhận:</b> ${escapeHtml(o.delivery_content)}\n` +
           `🕒 <b>Thời gian:</b> ${formatDate(o.created_at)}\n` +
           `━━━━━━━━━━━━━━━━━━━━\n`;
       } else {

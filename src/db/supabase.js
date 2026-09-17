@@ -444,7 +444,7 @@ async function getRecentRentalHistory(limit = 10) {
 const DEFAULT_ACCOUNT_PRODUCT = {
   id: "gg-ai-pro-18m",
   name: "GG AI Pro 18 tháng",
-  description: "Link Google AI Pro dùng trong 18 tháng. Admin nhập link thật vào kho trước khi bán.",
+  description: "Nội dung Google AI Pro dùng trong 18 tháng. Admin nhập nội dung thật vào kho trước khi bán.",
   price: config.ACCOUNT_DEFAULT_PRICE_VND,
   active: true,
   delivery_type: "link",
