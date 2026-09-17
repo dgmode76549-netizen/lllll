@@ -190,6 +190,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
 
   activePollers.set(orderId, {
     interval: pollInterval,
+    orderId,
     rentalId,
     telegramId,
     startTime,
@@ -207,6 +208,7 @@ function getActiveRentalsForUser(telegramId) {
   return [...activePollers.values()]
     .filter((session) => !session.stopped && Number(session.telegramId) === Number(telegramId))
     .map((session) => ({
+      orderId: session.orderId,
       serverId: session.serverId,
       phoneNumber: session.phoneNumber || "Đang cấp số",
       remainingSeconds: Math.max(0, Math.ceil((session.expiresAtMs - now) / 1000)),

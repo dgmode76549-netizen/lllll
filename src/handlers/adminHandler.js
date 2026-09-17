@@ -1,6 +1,7 @@
 const otpService = require("../services/otpService");
 const db = require("../db/supabase");
 const config = require("../config");
+const { Markup } = require("telegraf");
 const { adminMenu, adminWalletMenu, accountAdminMenu, mainMenu, isUserAdmin } = require("../keyboards/menus");
 
 function formatMoney(n) {
@@ -117,12 +118,12 @@ function registerAdminHandler(bot) {
     adminStates.delete(ctx.from.id);
     return ctx.reply(
       "🛒 <b>QUẢN LÝ KHO MUA ACC</b>\n\n" +
-        "Tạo sản phẩm mới kèm link đầu tiên, hoặc nhập thêm link vào sản phẩm đang có. Dữ liệu được lưu vào Supabase.",
+        "Quản lý sản phẩm, mô tả và link giao cho khách. Chọn đúng thao tác bên dưới.",
       { parse_mode: "HTML", ...accountAdminMenu() }
     );
   });
 
-  bot.hears("➕ Thêm sản phẩm acc", async (ctx) => {
+  bot.hears(["➕ Thêm sản phẩm", "➕ Thêm sản phẩm acc"], async (ctx) => {
     if (!requireAdmin(ctx)) return;
     adminStates.set(ctx.from.id, { step: "ACCOUNT_ADD_NAME" });
     return ctx.reply(
@@ -134,7 +135,54 @@ function registerAdminHandler(bot) {
     );
   });
 
-  bot.hears("➕ Nhập thêm link kho", async (ctx) => {
+  bot.hears(["🗑️ Xóa sản phẩm", "🗑️ Xóa sản phẩm acc"], async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const products = await db.getAccountProducts(true);
+    const list = products.map((p) =>
+      `<code>${escapeHtml(p.id)}</code> — ${escapeHtml(p.name)} (còn ${Number(p.available_count) || 0} link)`
+    ).join("\n");
+    adminStates.set(ctx.from.id, { step: "ACCOUNT_DELETE_PRODUCT" });
+    return ctx.reply(
+      "🗑️ <b>XÓA SẢN PHẨM</b>\n" +
+      "━━━━━━━━━━━━━━━━━━━━\n" +
+      "Gửi ID sản phẩm cần xóa. Thao tác này sẽ xóa cả link chưa bán trong kho.\n\n" +
+      (list || "Chưa có sản phẩm") +
+      "\n\nGõ <code>hủy</code> để thoát.",
+      { parse_mode: "HTML", ...accountAdminMenu() }
+    );
+  });
+
+  bot.action(/^ADMIN_DELETE_PRODUCT:(.+)$/, async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const productId = decodeURIComponent(ctx.match[1]);
+    await ctx.answerCbQuery("Đang xóa sản phẩm...");
+    const product = await db.getAccountProduct(productId);
+    if (!product) return ctx.reply("❌ Sản phẩm không còn tồn tại.", { ...accountAdminMenu() });
+
+    const deleted = await db.deleteAccountProduct(productId);
+    adminStates.delete(ctx.from.id);
+    try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+    if (!deleted) {
+      return ctx.reply(
+        "❌ Không thể xóa sản phẩm. Nếu sản phẩm đã có đơn bán, hãy tắt sản phẩm hoặc kiểm tra lại Supabase.",
+        { ...accountAdminMenu() }
+      );
+    }
+    return ctx.reply(
+      `✅ Đã xóa sản phẩm <b>${escapeHtml(product.name)}</b> và các link chưa bán trong kho.`,
+      { parse_mode: "HTML", ...accountAdminMenu() }
+    );
+  });
+
+  bot.action("ADMIN_DELETE_CANCEL", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    adminStates.delete(ctx.from.id);
+    await ctx.answerCbQuery("Đã hủy");
+    try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+    return ctx.reply("✅ Đã hủy xóa sản phẩm.", { ...accountAdminMenu() });
+  });
+
+  bot.hears(["➕ Nhập link kho", "➕ Nhập thêm link kho"], async (ctx) => {
     if (!requireAdmin(ctx)) return;
     const products = await db.getAccountProducts(true);
     const list = products.map((p) => `<code>${escapeHtml(p.id)}</code> — ${escapeHtml(p.name)}`).join("\n");
@@ -142,7 +190,7 @@ function registerAdminHandler(bot) {
     return ctx.reply(`Gửi <b>ID sản phẩm</b> cần nhập link:\n\n${list || "Chưa có sản phẩm"}`, { parse_mode: "HTML" });
   });
 
-  bot.hears("📦 Xem kho acc", async (ctx) => {
+  bot.hears(["📦 Xem kho", "📦 Xem kho acc"], async (ctx) => {
     if (!requireAdmin(ctx)) return;
     return executeViewAccountStock(ctx);
   });
@@ -152,7 +200,7 @@ function registerAdminHandler(bot) {
     return executeViewAccountOrders(ctx);
   });
 
-  bot.hears("📊 Thống kê doanh số acc", async (ctx) => {
+  bot.hears(["📊 Thống kê", "📊 Thống kê doanh số acc"], async (ctx) => {
     if (!requireAdmin(ctx)) return;
     return executeViewAccountStats(ctx);
   });
@@ -287,7 +335,7 @@ function registerAdminHandler(bot) {
       const productId = `acc-${Date.now()}`;
       const product = await db.createAccountProduct({ id: productId, name: st.name, price: st.price, description: st.description });
       if (!product) return ctx.reply("❌ Không thể tạo sản phẩm. Kiểm tra kết nối Supabase rồi thử lại.", { ...accountAdminMenu() });
-      if (text === "-") return ctx.reply(`✅ Đã tạo sản phẩm mới.\n🆔 ID: <code>${escapeHtml(productId)}</code>\n\nDùng nút <b>➕ Nhập thêm link kho</b> để bổ sung hàng.`, { parse_mode: "HTML", ...accountAdminMenu() });
+      if (text === "-") return ctx.reply(`✅ Đã tạo sản phẩm mới.\n🆔 ID: <code>${escapeHtml(productId)}</code>\n\nDùng nút <b>➕ Nhập link kho</b> để bổ sung hàng.`, { parse_mode: "HTML", ...accountAdminMenu() });
       const stock = await db.addAccountInventory(productId, text, ctx.from.id);
       if (!stock) {
         await db.deleteAccountProduct(productId);
@@ -301,6 +349,27 @@ function registerAdminHandler(bot) {
       if (!product) return ctx.reply("❌ Không tìm thấy ID sản phẩm. Gửi lại hoặc gõ cancel.");
       adminStates.set(ctx.from.id, { step: "ACCOUNT_STOCK_VALUE", productId: product.id, productName: product.name });
       return ctx.reply(`Gửi link/nội dung kho cho <b>${escapeHtml(product.name)}</b>:`, { parse_mode: "HTML" });
+    }
+
+    if (st.step === "ACCOUNT_DELETE_PRODUCT") {
+      const product = await db.getAccountProduct(text);
+      if (!product) return ctx.reply("❌ Không tìm thấy ID sản phẩm. Gửi lại hoặc gõ hủy.");
+      adminStates.set(ctx.from.id, { step: "ACCOUNT_DELETE_CONFIRM", productId: product.id });
+      return ctx.reply(
+        `⚠️ <b>XÁC NHẬN XÓA SẢN PHẨM</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Tên:</b> ${escapeHtml(product.name)}\n` +
+        `🆔 <b>ID:</b> <code>${escapeHtml(product.id)}</code>\n` +
+        `📊 <b>Link còn lại:</b> ${Number(product.available_count) || 0}\n\n` +
+        `Sản phẩm và link chưa bán sẽ bị xóa khỏi kho.`,
+        {
+          parse_mode: "HTML",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback("⚠️ XÓA VĨNH VIỄN", `ADMIN_DELETE_PRODUCT:${encodeURIComponent(product.id)}`)],
+            [Markup.button.callback("↩️ Hủy", "ADMIN_DELETE_CANCEL")],
+          ]),
+        }
+      );
     }
 
     if (st.step === "ACCOUNT_STOCK_VALUE") {

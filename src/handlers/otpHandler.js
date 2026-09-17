@@ -304,6 +304,36 @@ function registerOtpHandler(bot) {
     }
   });
 
+  // Mở chi tiết một số đang thuê và hiển thị đầy đủ dữ liệu đơn hàng.
+  bot.action(/^ACTIVE_RENTAL:(.+)$/, async (ctx) => {
+    const orderId = decodeURIComponent(ctx.match[1]);
+    await ctx.answerCbQuery();
+
+    const activeRental = loadActiveRentals(ctx.from?.id).find((item) => item.orderId === orderId);
+    const order = await db.getOrder(orderId);
+    if (!order || Number(order.telegram_id) !== Number(ctx.from?.id) || !activeRental) {
+      return ctx.reply("ℹ️ Đơn thuê này không còn hoạt động. Vui lòng làm mới danh sách.");
+    }
+
+    const phoneNumber = activeRental.phoneNumber || order.phone_number || "Đang cấp số";
+    const phoneLine = phoneNumber === "Đang cấp số"
+      ? "⏳ <b>Số điện thoại:</b> Đang cấp số, bot sẽ gửi ngay khi có số"
+      : `📞 <b>Số điện thoại:</b> <code>${escapeHtml(phoneNumber)}</code> <i>(Chạm để sao chép)</i>`;
+    const amount = Number(order.amount) || config.OTP_PRICE_VND;
+
+    return ctx.reply(
+      `${phoneLine}\n` +
+      `📦 <b>Dịch vụ:</b> Shopee · Vietnam\n` +
+      `💵 <b>Giá thuê:</b> ${formatMoney(amount)}đ\n` +
+      `⏱️ <b>Thời gian còn lại:</b> <code>${formatCountdown(activeRental.remainingSeconds)}</code>\n` +
+      `🧾 <b>Mã đơn:</b> <code>${escapeHtml(orderId)}</code>`,
+      {
+        parse_mode: "HTML",
+        ...otpRentalInlineKeyboard(orderId, activeRental.remainingSeconds, activeRental.serverId === "2"),
+      }
+    );
+  });
+
   // Mỗi server có danh mục riêng; SV2 dùng product_id dạng s2:<country>:<service>.
   bot.action(/^OTP_SERVER:([12])$/, async (ctx) => {
     const serverId = ctx.match[1];

@@ -44,9 +44,9 @@ function adminWalletMenu() {
 
 function accountAdminMenu() {
   return Markup.keyboard([
-    ["➕ Thêm sản phẩm acc", "➕ Nhập thêm link kho"],
-    ["📦 Xem kho acc", "🧾 Đơn mua acc"],
-    ["📊 Thống kê doanh số acc"],
+    ["➕ Thêm sản phẩm", "🗑️ Xóa sản phẩm"],
+    ["➕ Nhập link kho", "📦 Xem kho"],
+    ["🧾 Đơn mua acc", "📊 Thống kê"],
     ["⬅️ Admin Panel"],
   ]).resize().persistent();
 }
@@ -89,10 +89,10 @@ function otpServerSelectionKeyboard(products = [], activeRentals = []) {
   }
 
   const activeRows = activeRentals
-    .filter((rental) => rental && (rental.serverId === "1" || rental.serverId === "2"))
+    .filter((rental) => rental && rental.orderId && (rental.serverId === "1" || rental.serverId === "2"))
     .map((rental) => [Markup.button.callback(
       `📱 SV${rental.serverId}: ${String(rental.phoneNumber || "Đang cấp số").slice(0, 22)} • còn ${formatCountdown(rental.remainingSeconds)}`,
-      "OTP_SERVERS"
+      `ACTIVE_RENTAL:${encodeURIComponent(rental.orderId)}`
     )]);
 
   return Markup.inlineKeyboard([
