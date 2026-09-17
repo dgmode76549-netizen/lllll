@@ -62,10 +62,10 @@ function registerAccountHandler(bot) {
     const message =
       `📦 <b>${escapeHtml(product.name)}</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📝 <b>Mô tả:</b> ${escapeHtml(product.description || "Link sản phẩm") }\n` +
+      `📝 <b>Mô tả:</b> ${escapeHtml(product.description || "Nội dung sản phẩm") }\n` +
       `💵 <b>Giá:</b> ${money(product.price)}đ\n` +
       `📦 <b>Tồn kho:</b> ${Number(product.available_count) || 0} link\n\n` +
-      `Thanh toán bằng số dư ví, link sẽ được gửi ngay sau khi mua thành công.`;
+      `Thanh toán bằng số dư ví, nội dung sẽ được gửi ngay sau khi mua thành công.`;
     const detailOptions = {
       parse_mode: "HTML",
       ...accountProductDetailKeyboard(product.id),
@@ -130,7 +130,7 @@ function registerAccountHandler(bot) {
           `💵 <b>Đã thanh toán:</b> ${money(price)}đ\n` +
           `💰 <b>Số dư còn lại:</b> ${money(result.newBalance)}đ\n` +
           `🧾 <b>Mã đơn:</b> <code>${escapeHtml(orderId)}</code>\n\n` +
-          `🔗 <b>Link/nội dung sản phẩm:</b>\n${deliveryText(result.delivery)}\n\n` +
+          `📦 <b>Nội dung sản phẩm:</b>\n${deliveryText(result.delivery)}\n\n` +
           `Đơn hàng đã được lưu vào lịch sử mua hàng.`,
         { parse_mode: "HTML", ...mainMenu(ctx.from.id) }
       );

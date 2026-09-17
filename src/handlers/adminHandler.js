@@ -129,7 +129,7 @@ function registerAdminHandler(bot) {
     return ctx.reply(
       "➕ <b>THÊM SẢN PHẨM MỚI</b>\n" +
       "━━━━━━━━━━━━━━━━━━━━\n" +
-      "Gửi lần lượt tên, giá, mô tả và link kho đầu tiên.\n" +
+      "Gửi lần lượt tên, giá, mô tả và nội dung kho đầu tiên.\n" +
       "Gõ <code>hủy</code> bất cứ lúc nào để thoát.",
       { parse_mode: "HTML", ...accountAdminMenu() }
     );
@@ -182,7 +182,7 @@ function registerAdminHandler(bot) {
     return ctx.reply("✅ Đã hủy xóa sản phẩm.", { ...accountAdminMenu() });
   });
 
-  bot.hears(["➕ Nhập link kho", "➕ Nhập thêm link kho"], async (ctx) => {
+  bot.hears(["➕ Nhập kho", "➕ Nhập link kho", "➕ Nhập thêm link kho"], async (ctx) => {
     if (!requireAdmin(ctx)) return;
     const products = await db.getAccountProducts(true);
     const list = products.map((p) => `<code>${escapeHtml(p.id)}</code> — ${escapeHtml(p.name)}`).join("\n");
@@ -335,11 +335,11 @@ function registerAdminHandler(bot) {
       const productId = `acc-${Date.now()}`;
       const product = await db.createAccountProduct({ id: productId, name: st.name, price: st.price, description: st.description });
       if (!product) return ctx.reply("❌ Không thể tạo sản phẩm. Kiểm tra kết nối Supabase rồi thử lại.", { ...accountAdminMenu() });
-      if (text === "-") return ctx.reply(`✅ Đã tạo sản phẩm mới.\n🆔 ID: <code>${escapeHtml(productId)}</code>\n\nDùng nút <b>➕ Nhập link kho</b> để bổ sung hàng.`, { parse_mode: "HTML", ...accountAdminMenu() });
+      if (text === "-") return ctx.reply(`✅ Đã tạo sản phẩm mới.\n🆔 ID: <code>${escapeHtml(productId)}</code>\n\nDùng nút <b>➕ Nhập kho</b> để bổ sung nội dung.`, { parse_mode: "HTML", ...accountAdminMenu() });
       const stock = await db.addAccountInventory(productId, text, ctx.from.id);
       if (!stock) {
         await db.deleteAccountProduct(productId);
-        return ctx.reply("❌ Không thể nhập link kho nên sản phẩm chưa được lưu. Vui lòng thực hiện lại.", { ...accountAdminMenu() });
+        return ctx.reply("❌ Không thể nhập nội dung kho nên sản phẩm chưa được lưu. Vui lòng thực hiện lại.", { ...accountAdminMenu() });
       }
       return ctx.reply(`✅ <b>Đã thêm sản phẩm mới</b> và 1 link vào kho.\n🆔 ID: <code>${escapeHtml(productId)}</code>`, { parse_mode: "HTML", ...accountAdminMenu() });
     }
@@ -360,8 +360,8 @@ function registerAdminHandler(bot) {
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `📦 <b>Tên:</b> ${escapeHtml(product.name)}\n` +
         `🆔 <b>ID:</b> <code>${escapeHtml(product.id)}</code>\n` +
-        `📊 <b>Link còn lại:</b> ${Number(product.available_count) || 0}\n\n` +
-        `Sản phẩm và link chưa bán sẽ bị xóa khỏi kho.`,
+        `📊 <b>Nội dung còn lại:</b> ${Number(product.available_count) || 0}\n\n` +
+        `Sản phẩm và nội dung chưa bán sẽ bị xóa khỏi kho.`,
         {
           parse_mode: "HTML",
           ...Markup.inlineKeyboard([
@@ -656,7 +656,7 @@ async function executeViewAccountStock(ctx) {
     `🆔 <code>${escapeHtml(product.id)}</code>\n` +
     `📦 ${escapeHtml(product.name)}\n` +
     `💵 ${formatMoney(product.price)}đ\n` +
-    `📊 Còn: <b>${Number(product.available_count) || 0}</b> link\n` +
+    `📊 Còn: <b>${Number(product.available_count) || 0}</b> nội dung\n` +
     `🔘 Trạng thái: ${product.active === false ? "TẮT" : "ĐANG BÁN"}`
   );
   return ctx.reply(`📦 <b>KHO MUA ACC</b>\n━━━━━━━━━━━━━━━━━━━━\n${lines.join("\n━━━━━━━━━━━━━━━━━━━━\n")}`, { parse_mode: "HTML", ...accountAdminMenu() });
@@ -685,8 +685,8 @@ async function executeViewAccountStats(ctx) {
     `📊 <b>THỐNG KÊ DOANH SỐ KHO MUA ACC</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `📦 <b>Sản phẩm:</b> ${stats.activeProducts}/${stats.totalProducts} đang bán\n` +
-    `🟢 <b>Link còn trong kho:</b> ${stats.availableStock}\n` +
-    `✅ <b>Link đã bán:</b> ${stats.soldStock}\n` +
+    `🟢 <b>Nội dung còn trong kho:</b> ${stats.availableStock}\n` +
+    `✅ <b>Nội dung đã bán:</b> ${stats.soldStock}\n` +
     `🧾 <b>Tổng đơn hoàn tất:</b> ${stats.totalOrders}\n` +
     `💰 <b>Tổng doanh thu:</b> ${formatMoney(stats.totalRevenue)}đ\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +

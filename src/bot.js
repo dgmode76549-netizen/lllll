@@ -36,12 +36,14 @@ bot.use(
 );
 
 // Đăng ký toàn bộ handlers
-registerStartHandler(bot);
-registerOtpHandler(bot);
-registerAccountHandler(bot);
-registerTopupHandler(bot);
-registerHistoryHandler(bot);
-registerAdminHandler(bot);
+  registerStartHandler(bot);
+  registerOtpHandler(bot);
+  registerAccountHandler(bot);
+  // Đặt luồng nhập liệu Admin trước các handler text chung để giá sản phẩm
+  // như 60000 không bị nhận nhầm là số tiền nạp.
+  registerAdminHandler(bot);
+  registerTopupHandler(bot);
+  registerHistoryHandler(bot);
 
 // Kích hoạt Casso Watcher đọc giao dịch từ Supabase
 startCassoWatcher(bot);
