@@ -556,26 +556,47 @@ async function addAccountInventory(productId, content, addedBy = null) {
 
 async function deleteAccountProduct(productId) {
   const id = String(productId || "").trim();
-  if (!id) return false;
+  if (!id) return { success: false, error: "Thiếu ID sản phẩm" };
   if (supabase) {
     try {
-      const { error } = await supabase.from("account_products").delete().eq("id", id);
-      if (!error) return true;
-      console.error("Supabase deleteAccountProduct error:", error.message);
-      return false;
+      const { error: deleteError } = await supabase.from("account_products").delete().eq("id", id);
+      if (!deleteError) return { success: true, mode: "deleted" };
+
+      // account_orders giữ khóa ngoại để bảo toàn lịch sử bán hàng.
+      // Nếu đã có đơn, ẩn sản phẩm thay vì xóa cứng.
+      const { data, error: hideError } = await supabase
+        .from("account_products")
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+      if (!hideError && data) return { success: true, mode: "hidden" };
+
+      console.error("Supabase deleteAccountProduct error:", deleteError.message);
+      if (hideError) console.error("Supabase hideAccountProduct error:", hideError.message);
+      return { success: false, error: hideError?.message || deleteError.message };
     } catch (e) {
       console.error("Supabase deleteAccountProduct catch:", e.message);
-      return false;
+      return { success: false, error: e.message };
     }
   }
   const fdb = loadFallbackDb();
-  if (!fdb.accountProducts?.[id]) return false;
+  if (!fdb.accountProducts?.[id]) return { success: false, error: "Không tìm thấy sản phẩm" };
+
+  const hasOrders = Object.values(fdb.accountOrders || {}).some((order) => String(order.product_id) === id);
+  if (hasOrders) {
+    fdb.accountProducts[id].active = false;
+    fdb.accountProducts[id].updated_at = new Date().toISOString();
+    saveFallbackDb(fdb);
+    return { success: true, mode: "hidden" };
+  }
+
   delete fdb.accountProducts[id];
   for (const [inventoryId, item] of Object.entries(fdb.accountInventory || {})) {
     if (String(item.product_id) === id) delete fdb.accountInventory[inventoryId];
   }
   saveFallbackDb(fdb);
-  return true;
+  return { success: true, mode: "deleted" };
 }
 
 function parseRpcPurchase(data) {

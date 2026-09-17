@@ -159,17 +159,24 @@ function registerAdminHandler(bot) {
     const product = await db.getAccountProduct(productId);
     if (!product) return ctx.reply("❌ Sản phẩm không còn tồn tại.", { ...accountAdminMenu() });
 
-    const deleted = await db.deleteAccountProduct(productId);
+    const deleteResult = await db.deleteAccountProduct(productId);
     adminStates.delete(ctx.from.id);
     try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
-    if (!deleted) {
+    if (!deleteResult?.success) {
       return ctx.reply(
-        "❌ Không thể xóa sản phẩm. Nếu sản phẩm đã có đơn bán, hãy tắt sản phẩm hoặc kiểm tra lại Supabase.",
+        `❌ Không thể xóa sản phẩm: ${escapeHtml(deleteResult?.error || "Lỗi Supabase")}`,
         { ...accountAdminMenu() }
       );
     }
+    if (deleteResult.mode === "hidden") {
+      return ctx.reply(
+        `✅ Sản phẩm <b>${escapeHtml(product.name)}</b> đã được ẩn/ngừng bán.\n` +
+        "Lịch sử các đơn đã bán vẫn được giữ nguyên.",
+        { parse_mode: "HTML", ...accountAdminMenu() }
+      );
+    }
     return ctx.reply(
-      `✅ Đã xóa sản phẩm <b>${escapeHtml(product.name)}</b> và các link chưa bán trong kho.`,
+      `✅ Đã xóa sản phẩm <b>${escapeHtml(product.name)}</b> và nội dung chưa bán trong kho.`,
       { parse_mode: "HTML", ...accountAdminMenu() }
     );
   });
