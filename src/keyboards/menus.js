@@ -45,8 +45,9 @@ function adminWalletMenu() {
 function accountAdminMenu() {
   return Markup.keyboard([
     ["➕ Thêm sản phẩm", "🗑️ Xóa sản phẩm"],
-    ["➕ Nhập kho", "📦 Xem kho"],
-    ["🧾 Đơn mua acc", "📊 Thống kê"],
+    ["🔘 Bật/tắt bán", "➕ Nhập kho"],
+    ["📦 Xem kho", "🧾 Đơn mua acc"],
+    ["📊 Thống kê"],
     ["⬅️ Admin Panel"],
   ]).resize().persistent();
 }

@@ -599,6 +599,35 @@ async function deleteAccountProduct(productId) {
   return { success: true, mode: "deleted" };
 }
 
+async function setAccountProductActive(productId, active) {
+  const id = String(productId || "").trim();
+  const nextActive = Boolean(active);
+  if (!id) return { success: false, error: "Thiếu ID sản phẩm" };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("account_products")
+        .update({ active: nextActive, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id,active")
+        .maybeSingle();
+      if (!error && data) return { success: true, active: Boolean(data.active) };
+      return { success: false, error: error?.message || "Không tìm thấy sản phẩm" };
+    } catch (e) {
+      console.error("Supabase setAccountProductActive catch:", e.message);
+      return { success: false, error: e.message };
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  if (!fdb.accountProducts?.[id]) return { success: false, error: "Không tìm thấy sản phẩm" };
+  fdb.accountProducts[id].active = nextActive;
+  fdb.accountProducts[id].updated_at = new Date().toISOString();
+  saveFallbackDb(fdb);
+  return { success: true, active: nextActive };
+}
+
 function parseRpcPurchase(data) {
   const value = Array.isArray(data) ? data[0] : data;
   if (!value) return null;
@@ -973,6 +1002,7 @@ module.exports = {
   createAccountProduct,
   addAccountInventory,
   deleteAccountProduct,
+  setAccountProductActive,
   purchaseAccountProduct,
   createAccountOrder,
   getUserAccountOrders,

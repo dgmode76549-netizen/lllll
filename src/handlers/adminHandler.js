@@ -186,7 +186,43 @@ function registerAdminHandler(bot) {
     adminStates.delete(ctx.from.id);
     await ctx.answerCbQuery("Đã hủy");
     try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
-    return ctx.reply("✅ Đã hủy xóa sản phẩm.", { ...accountAdminMenu() });
+    return ctx.reply("✅ Đã hủy thao tác.", { ...accountAdminMenu() });
+  });
+
+  bot.hears("🔘 Bật/tắt bán", async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const products = await db.getAccountProducts(true);
+    const list = products.map((p) =>
+      `<code>${escapeHtml(p.id)}</code> — ${escapeHtml(p.name)} — ${p.active === false ? "⛔ ĐANG TẮT" : "✅ ĐANG BÁN"}`
+    ).join("\n");
+    adminStates.set(ctx.from.id, { step: "ACCOUNT_TOGGLE_PRODUCT" });
+    return ctx.reply(
+      "🔘 <b>BẬT / TẮT BÁN SẢN PHẨM</b>\n" +
+      "━━━━━━━━━━━━━━━━━━━━\n" +
+      "Gửi ID sản phẩm cần đổi trạng thái. Tắt bán không xóa dữ liệu, có thể bật lại sau.\n\n" +
+      (list || "Chưa có sản phẩm") +
+      "\n\nGõ <code>hủy</code> để thoát.",
+      { parse_mode: "HTML", ...accountAdminMenu() }
+    );
+  });
+
+  bot.action(/^ADMIN_TOGGLE_PRODUCT:(.+)$/, async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    const productId = decodeURIComponent(ctx.match[1]);
+    await ctx.answerCbQuery("Đang cập nhật trạng thái...");
+    const product = await db.getAccountProduct(productId);
+    if (!product) return ctx.reply("❌ Sản phẩm không còn tồn tại.", { ...accountAdminMenu() });
+
+    const result = await db.setAccountProductActive(productId, product.active === false);
+    adminStates.delete(ctx.from.id);
+    try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+    if (!result.success) return ctx.reply(`❌ Không thể đổi trạng thái: ${escapeHtml(result.error || "Lỗi Supabase")}`, { ...accountAdminMenu() });
+    return ctx.reply(
+      result.active
+        ? `✅ Đã <b>bật bán</b> sản phẩm <b>${escapeHtml(product.name)}</b>.`
+        : `⛔ Đã <b>tắt bán</b> sản phẩm <b>${escapeHtml(product.name)}</b>. Có thể bật lại bất cứ lúc nào.`,
+      { parse_mode: "HTML", ...accountAdminMenu() }
+    );
   });
 
   bot.hears(["➕ Nhập kho", "➕ Nhập link kho", "➕ Nhập thêm link kho"], async (ctx) => {
@@ -379,11 +415,33 @@ function registerAdminHandler(bot) {
       );
     }
 
+    if (st.step === "ACCOUNT_TOGGLE_PRODUCT") {
+      const product = await db.getAccountProduct(text);
+      if (!product) return ctx.reply("❌ Không tìm thấy ID sản phẩm. Gửi lại hoặc gõ hủy.");
+      adminStates.set(ctx.from.id, { step: "ACCOUNT_TOGGLE_CONFIRM", productId: product.id });
+      const nextLabel = product.active === false ? "▶️ BẬT BÁN LẠI" : "⛔ TẮT BÁN";
+      return ctx.reply(
+        `🔘 <b>ĐỔI TRẠNG THÁI SẢN PHẨM</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Tên:</b> ${escapeHtml(product.name)}\n` +
+        `🆔 <b>ID:</b> <code>${escapeHtml(product.id)}</code>\n` +
+        `🔘 <b>Hiện tại:</b> ${product.active === false ? "ĐANG TẮT" : "ĐANG BÁN"}\n\n` +
+        `Chọn thao tác bên dưới:`,
+        {
+          parse_mode: "HTML",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(nextLabel, `ADMIN_TOGGLE_PRODUCT:${encodeURIComponent(product.id)}`)],
+            [Markup.button.callback("↩️ Hủy", "ADMIN_DELETE_CANCEL")],
+          ]),
+        }
+      );
+    }
+
     if (st.step === "ACCOUNT_STOCK_VALUE") {
       adminStates.delete(ctx.from.id);
       const stock = await db.addAccountInventory(st.productId, text, ctx.from.id);
-      if (!stock) return ctx.reply("❌ Không thể nhập link vào kho. Vui lòng thử lại.", { ...accountAdminMenu() });
-      return ctx.reply(`✅ Đã nhập thêm 1 link vào kho <b>${escapeHtml(st.productName)}</b>.`, { parse_mode: "HTML", ...accountAdminMenu() });
+      if (!stock) return ctx.reply("❌ Không thể nhập nội dung vào kho. Vui lòng thử lại.", { ...accountAdminMenu() });
+      return ctx.reply(`✅ Đã nhập thêm 1 nội dung vào kho <b>${escapeHtml(st.productName)}</b>.`, { parse_mode: "HTML", ...accountAdminMenu() });
     }
 
     if (st.step === "WAIT_ADD") {
