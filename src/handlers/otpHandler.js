@@ -60,6 +60,10 @@ function productCatalogError(response) {
   return response?.error || response?.message || "Không thể tải danh sách sản phẩm từ nhà cung cấp";
 }
 
+function loadActiveRentals(telegramId) {
+  return rentalManager.getActiveRentalsForUser(telegramId);
+}
+
 const productCache = new Map();
 const PRODUCT_CACHE_TTL_MS = 10000;
 
@@ -82,19 +86,25 @@ async function loadProducts(serverId = "") {
 }
 
 async function showServerSelection(ctx) {
-  const { response, products } = await loadProducts();
+  const [{ response, products }, activeRentals] = await Promise.all([
+    loadProducts(),
+    Promise.resolve(loadActiveRentals(ctx.from?.id)),
+  ]);
   if (!response?.success || !Array.isArray(response.products)) {
     return ctx.reply(`❌ ${productCatalogError(response)}. Vui lòng thử lại sau ít phút.`);
   }
 
   return ctx.reply(
-    `🛒 <b>CHỌN SERVER THUÊ OTP</b>\n` +
+      `🛒 <b>CHỌN SERVER THUÊ OTP</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `Chọn SV1 hoặc SV2 để xem các gói đang có.\n` +
-      `Giá gốc và số lượng sẽ được cập nhật trực tiếp từ nhà cung cấp.`,
+      `Giá gốc và số lượng sẽ được cập nhật trực tiếp từ nhà cung cấp.` +
+      (activeRentals.length
+        ? `\n\n📌 <b>SỐ BẠN ĐANG THUÊ</b>\nCác dòng bên dưới hiển thị số và thời gian còn lại.`
+        : ""),
     {
       parse_mode: "HTML",
-      ...otpServerSelectionKeyboard(products),
+      ...otpServerSelectionKeyboard(products, activeRentals),
     }
   );
 }
@@ -228,6 +238,7 @@ function registerOtpHandler(bot) {
       chatId: ctx.chat.id,
       messageId: sentMsg.message_id,
       serverId,
+      phoneNumber: rental.phone_number || "Đang cấp số",
       pendingPhoneNotification: !rental.phone_number,
     });
     } catch (err) {
@@ -237,6 +248,7 @@ function registerOtpHandler(bot) {
         // Đã tạo đơn thì giữ tiền và tiếp tục theo dõi, kể cả khi gửi tin nhắn bị lỗi.
         rentalManager.startRentalPolling(bot, createdOrderId, rental.id, from.id, createdExpiresAtMs, {
           serverId,
+          phoneNumber: rental.phone_number || "Đang cấp số",
           pendingPhoneNotification: !rental.phone_number,
         });
         try {
@@ -270,16 +282,22 @@ function registerOtpHandler(bot) {
   bot.action("OTP_SERVERS", async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const { response, products } = await loadProducts();
+      const [{ response, products }, activeRentals] = await Promise.all([
+        loadProducts(),
+        Promise.resolve(loadActiveRentals(ctx.from?.id)),
+      ]);
       if (!response?.success || !Array.isArray(response.products)) {
         return ctx.reply(`❌ ${productCatalogError(response)}. Vui lòng thử lại sau ít phút.`);
       }
       return ctx.editMessageText(
-        `🛒 <b>CHỌN SERVER THUÊ OTP</b>\n` +
+          `🛒 <b>CHỌN SERVER THUÊ OTP</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `Chọn SV1 hoặc SV2 để xem các gói đang có.\n` +
-          `Giá gốc và số lượng sẽ được cập nhật trực tiếp từ nhà cung cấp.`,
-        { parse_mode: "HTML", ...otpServerSelectionKeyboard(products) }
+          `Giá gốc và số lượng sẽ được cập nhật trực tiếp từ nhà cung cấp.` +
+          (activeRentals.length
+            ? `\n\n📌 <b>SỐ BẠN ĐANG THUÊ</b>\nCác dòng bên dưới hiển thị số và thời gian còn lại.`
+            : ""),
+        { parse_mode: "HTML", ...otpServerSelectionKeyboard(products, activeRentals) }
       );
     } catch (e) {
       return ctx.reply("❌ Không thể tải danh sách server: " + e.message);

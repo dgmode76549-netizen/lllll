@@ -105,6 +105,7 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
         const otpCode = rental.otp_code || rental.otp || rental.code;
 
         if (phoneNumber && !phoneNotified) {
+          session.phoneNumber = phoneNumber;
           await db.updateOrderStatus(orderId, { phoneNumber });
           try {
             await bot.telegram.sendMessage(
@@ -192,12 +193,25 @@ function startRentalPolling(bot, orderId, rentalId, telegramId, expiresAtMs, met
     rentalId,
     telegramId,
     startTime,
-    expiresAtMs,
+    expiresAtMs: startTime + timeoutMs,
+    phoneNumber: meta.phoneNumber || "Đang cấp số",
     meta,
     serverId: String(meta.serverId || config.OTP_SERVER_ID || "1"),
     polling: false,
     stopped: false,
   });
+}
+
+function getActiveRentalsForUser(telegramId) {
+  const now = Date.now();
+  return [...activePollers.values()]
+    .filter((session) => !session.stopped && Number(session.telegramId) === Number(telegramId))
+    .map((session) => ({
+      serverId: session.serverId,
+      phoneNumber: session.phoneNumber || "Đang cấp số",
+      remainingSeconds: Math.max(0, Math.ceil((session.expiresAtMs - now) / 1000)),
+    }))
+    .filter((session) => session.remainingSeconds > 0);
 }
 
 /**
@@ -334,6 +348,7 @@ async function handleTimeoutOrCancel(bot, orderId, reason = "Đã hủy") {
 module.exports = {
   startRentalPolling,
   stopRentalPolling,
+  getActiveRentalsForUser,
   checkOtpManually,
   cancelPendingRental,
   handleTimeoutOrCancel,

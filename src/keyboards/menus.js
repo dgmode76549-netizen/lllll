@@ -80,7 +80,7 @@ function insufficientBalanceKeyboard() {
   ]);
 }
 
-function otpServerSelectionKeyboard(products = []) {
+function otpServerSelectionKeyboard(products = [], activeRentals = []) {
   const counts = { "1": 0, "2": 0 };
   for (const product of products) {
     const productId = String(product?.id || "");
@@ -88,11 +88,19 @@ function otpServerSelectionKeyboard(products = []) {
     if (serverId === "1" || serverId === "2") counts[serverId] += 1;
   }
 
+  const activeRows = activeRentals
+    .filter((rental) => rental && (rental.serverId === "1" || rental.serverId === "2"))
+    .map((rental) => [Markup.button.callback(
+      `📱 SV${rental.serverId}: ${String(rental.phoneNumber || "Đang cấp số").slice(0, 22)} • còn ${formatCountdown(rental.remainingSeconds)}`,
+      "OTP_SERVERS"
+    )]);
+
   return Markup.inlineKeyboard([
     [
       Markup.button.callback(`🖥️ SV1${counts["1"] ? ` (${counts["1"]} gói)` : ""}`, "OTP_SERVER:1"),
       Markup.button.callback(`🖥️ SV2${counts["2"] ? ` (${counts["2"]} gói)` : ""}`, "OTP_SERVER:2"),
     ],
+    ...activeRows,
     [Markup.button.callback("🔄 Làm mới danh sách", "OTP_SERVERS")],
   ]);
 }
