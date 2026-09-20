@@ -24,7 +24,13 @@ async function notifyAdminsTopupSuccess(bot, {
   payContent,
   user,
 }) {
-  const adminIds = [...new Set((config.ADMIN_IDS || []).filter((id) => Number.isSafeInteger(id) && id > 0))];
+  // Nếu người nạp cũng là admin, không gửi thêm một tin admin vào cùng chat.
+  // Người nạp sẽ chỉ nhận đúng một tin xác nhận từ luồng giao dịch chính.
+  const adminIds = [...new Set(
+    (config.ADMIN_IDS || [])
+      .filter((id) => Number.isSafeInteger(id) && id > 0)
+      .filter((id) => Number(id) !== Number(telegramId))
+  )];
   if (!adminIds.length) return;
 
   const username = user?.username ? `@${String(user.username).replace(/^@/, "")}` : "—";

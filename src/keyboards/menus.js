@@ -27,27 +27,25 @@ function topupMenu() {
 
 function adminMenu() {
   return Markup.keyboard([
-    ["📊 Số dư Provider & Thống kê", "💰 Quản lý ví khách"],
-    ["🛒 Quản lý mua acc"],
-    ["📜 Lịch sử thuê OTP"],
-    ["📢 Thông báo toàn bộ người dùng"],
+    ["📊 Tổng quan", "💰 Ví khách"],
+    ["🛒 Kho sản phẩm", "📜 Lịch sử thuê"],
+    ["📢 Thông báo"],
     ["⬅️ Về menu"],
   ]).resize().persistent();
 }
 
 function adminWalletMenu() {
   return Markup.keyboard([
-    ["➕ Cộng tiền", "➖ Trừ tiền", "= Set số dư"],
+    ["➕ Cộng", "➖ Trừ", "= Đặt số dư"],
     ["🧾 Xem ví khách", "⬅️ Admin Panel"],
   ]).resize().persistent();
 }
 
 function accountAdminMenu() {
   return Markup.keyboard([
-    ["➕ Thêm sản phẩm", "🗑️ Xóa sản phẩm"],
-    ["🔘 Bật/tắt bán", "➕ Nhập kho"],
-    ["📦 Xem kho", "🧾 Đơn mua acc"],
-    ["📊 Thống kê"],
+    ["➕ Thêm sản phẩm", "✏️ Sửa sản phẩm"],
+    ["➕ Nhập kho", "📦 Xem kho"],
+    ["🧾 Đơn mua", "📊 Thống kê"],
     ["⬅️ Admin Panel"],
   ]).resize().persistent();
 }

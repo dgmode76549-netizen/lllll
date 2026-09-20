@@ -54,18 +54,21 @@ const config = {
   SPAM_MAX_CONCURRENT: Number(process.env.SPAM_MAX_CONCURRENT) || 2,
   SPAM_MAX_TRACKED_USERS: Number(process.env.SPAM_MAX_TRACKED_USERS) || 10000,
 
-  // Cấu hình Casso & VietQR
-  CASSO_API_KEY: process.env.CASSO_API_KEY || "",
-  CASSO_WEBHOOK_SECRET: process.env.CASSO_WEBHOOK_SECRET || "",
-  CASSO_WEBHOOK_URL: process.env.CASSO_WEBHOOK_URL || "",
-  CASSO_BANK_CODE: process.env.CASSO_BANK_CODE || "MB",
-  CASSO_ACCOUNT_NUMBER: process.env.CASSO_ACCOUNT_NUMBER || "35656568905",
-  CASSO_ACCOUNT_NAME: process.env.CASSO_ACCOUNT_NAME || "PHAM TRUNG DUNG",
-  CASSO_QR_TEMPLATE: process.env.CASSO_QR_TEMPLATE || "compact2",
+  // Cấu hình SePay + VietQR
+  SEPAY_API_KEY: process.env.SEPAY_API_KEY || "",
+  SEPAY_API_TOKEN: process.env.SEPAY_API_TOKEN || "",
+  SEPAY_AUTH_MODE: String(process.env.SEPAY_AUTH_MODE || "apikey").toLowerCase(),
+  SEPAY_WEBHOOK_SECRET: process.env.SEPAY_WEBHOOK_SECRET || "",
+  SEPAY_HMAC_MAX_SKEW_SECONDS: Number(process.env.SEPAY_HMAC_MAX_SKEW_SECONDS) || 300,
+  SEPAY_WEBHOOK_PATH: process.env.SEPAY_WEBHOOK_PATH || "/webhook/sepay",
+  SEPAY_QR_BASE_URL: process.env.SEPAY_QR_BASE_URL || "https://vietqr.app/img",
+  SEPAY_BANK_CODE: process.env.SEPAY_BANK_CODE || process.env.CASSO_BANK_CODE || "MBBank",
+  SEPAY_ACCOUNT_NUMBER: process.env.SEPAY_ACCOUNT_NUMBER || process.env.CASSO_ACCOUNT_NUMBER || "35656568905",
+  SEPAY_ACCOUNT_NAME: process.env.SEPAY_ACCOUNT_NAME || process.env.CASSO_ACCOUNT_NAME || "PHAM TRUNG DUNG",
 
   // Server
   PORT: process.env.PORT || 3000,
-  WEBHOOK_PORT: process.env.WEBHOOK_PORT || 8000,
+  WEBHOOK_PORT: Number(process.env.WEBHOOK_PORT) || 8000,
 
   settings: loadSettings(),
 };

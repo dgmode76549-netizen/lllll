@@ -1,18 +1,26 @@
 const db = require("../db/supabase");
+const { Markup } = require("telegraf");
 const { mainMenu } = require("../keyboards/menus");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 function formatDate(isoStr) {
   if (!isoStr) return "—";
   try {
     const d = new Date(isoStr);
-    const day = String(d.getDate()).padStart(2, "0");
-    const mon = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
-    const h = String(d.getHours()).padStart(2, "0");
-    const m = String(d.getMinutes()).padStart(2, "0");
-    return `${h}:${m} - ${day}/${mon}/${year}`;
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).replace(",", "");
   } catch {
-    return isoStr;
+    return "—";
   }
 }
 
@@ -23,6 +31,49 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function formatMoney(value) {
+  return `${(Number(value) || 0).toLocaleString("vi-VN")}đ`;
+}
+
+function shortText(value, max = 120) {
+  const text = String(value ?? "—").replace(/[\r\n]+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function statusLabel(order) {
+  const status = String(order.status || "COMPLETED").toUpperCase();
+  const labels = {
+    COMPLETED: "✅ Hoàn tất",
+    DONE: "✅ Hoàn tất",
+    REFUNDED: "💸 Đã hoàn tiền",
+    CANCELLED: "❌ Đã hủy",
+    PENDING: "⏳ Đang xử lý",
+  };
+  return labels[status] || `⚪ ${status}`;
+}
+
+function orderFileName(productName, orderId) {
+  const safeProduct = String(productName || "san-pham")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 45) || "san-pham";
+  const safeOrder = String(orderId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 35);
+  return `${safeProduct}-${safeOrder}.txt`;
+}
+
+function createOrderFile(order) {
+  const fileName = orderFileName(order.product_name, order.id);
+  const filePath = path.join(os.tmpdir(), `tg-history-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${fileName}`);
+  fs.writeFileSync(
+    filePath,
+    `SẢN PHẨM: ${order.product_name || "—"}\nMÃ ĐƠN: ${order.id}\nTHỜI GIAN: ${formatDate(order.created_at)}\n========================================\n\n${String(order.delivery_content || "").trim()}\n`,
+    "utf8"
+  );
+  return { filePath, fileName };
 }
 
 function registerHistoryHandler(bot) {
@@ -49,31 +100,70 @@ function registerHistoryHandler(bot) {
       );
     }
 
-    let msg = `📜 <b>LỊCH SỬ GIAO DỊCH GẦN NHẤT (Top ${orders.length})</b>\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+    const accountCount = orders.filter((order) => order.historyType === "account").length;
+    const rentalCount = orders.length - accountCount;
+    const totalSpent = orders.reduce((sum, order) => sum + (Number(order.amount) || Number(order.price) || 0), 0);
+    const downloadButtons = [];
+    let msg =
+      `📜 <b>LỊCH SỬ GIAO DỊCH</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 Mua acc: <b>${accountCount}</b>  •  📱 Thuê số: <b>${rentalCount}</b>\n` +
+      `💰 Tổng chi tiêu: <b>${formatMoney(totalSpent)}</b>\n` +
+      `🕘 Hiển thị ${orders.length} giao dịch gần nhất\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n`;
 
     orders.forEach((o, index) => {
       if (o.historyType === "account") {
         msg +=
-          `<b>#${index + 1}. Mua acc:</b> <code>${escapeHtml(o.id)}</code>\n` +
-          `📦 <b>Sản phẩm:</b> ${escapeHtml(o.product_name)}\n` +
-          `💵 <b>Thanh toán:</b> ${Number(o.amount || 0).toLocaleString("vi-VN")}đ\n` +
-          `📦 <b>Nội dung đã nhận:</b> ${escapeHtml(o.delivery_content)}\n` +
-          `🕒 <b>Thời gian:</b> ${formatDate(o.created_at)}\n` +
+          `\n<b>${index + 1}. 🛒 MUA SẢN PHẨM</b>\n` +
+          `📦 ${escapeHtml(shortText(o.product_name, 80))}\n` +
+          `💵 ${formatMoney(o.amount)}  •  ${statusLabel(o)}\n` +
+          `🕒 ${formatDate(o.created_at)}\n` +
+          `🧾 Mã đơn: <code>${escapeHtml(shortText(o.id, 32))}</code>\n` +
+          `📄 File giao hàng: <b>Sẵn sàng tải lại bên dưới</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n`;
+        downloadButtons.push([Markup.button.callback(`📥 Tải lại đơn #${shortText(o.id, 18)}`, `HISTORY_DOWNLOAD:${encodeURIComponent(String(o.id))}`)]);
       } else {
         msg +=
-          `<b>#${index + 1}. Thuê số:</b> <code>${escapeHtml(o.id)}</code>\n` +
-          `📱 <b>SĐT:</b> <code>${escapeHtml(o.phone_number)}</code>\n` +
-          `🔑 <b>Mã OTP:</b> <code>${escapeHtml(o.otp_code)}</code>\n` +
-          `🕒 <b>Thời gian:</b> ${formatDate(o.created_at)}\n` +
+          `\n<b>${index + 1}. 📱 THUÊ SỐ OTP</b>\n` +
+          `📱 SĐT: <code>${escapeHtml(o.phone_number)}</code>  •  🔑 OTP: <code>${escapeHtml(o.otp_code || "—")}</code>\n` +
+          `💵 ${formatMoney(o.amount || o.price)}  •  ${statusLabel(o)}\n` +
+          `🕒 ${formatDate(o.created_at)}\n` +
           `━━━━━━━━━━━━━━━━━━━━\n`;
       }
     });
 
     return ctx.reply(msg, {
       parse_mode: "HTML",
-      ...mainMenu(ctx.from.id),
+      ...Markup.inlineKeyboard(downloadButtons),
     });
+  });
+
+  bot.action(/^HISTORY_DOWNLOAD:(.+)$/, async (ctx) => {
+    const orderId = decodeURIComponent(ctx.match[1]);
+    const order = await db.getUserAccountOrder(ctx.from.id, orderId);
+    if (!order) return ctx.answerCbQuery("Không tìm thấy đơn hàng của bạn", { show_alert: true });
+    if (!String(order.delivery_content || "").trim()) return ctx.answerCbQuery("Đơn này không có nội dung file", { show_alert: true });
+
+    await ctx.answerCbQuery("Đang tạo file TXT...");
+    let file = null;
+    try {
+      file = createOrderFile(order);
+      return await ctx.replyWithDocument(
+        { source: file.filePath, filename: file.fileName },
+        {
+          caption: `📄 <b>FILE ĐƠN HÀNG</b>\nMã đơn: <code>${escapeHtml(order.id)}</code>\nSản phẩm: <b>${escapeHtml(order.product_name)}</b>`,
+          parse_mode: "HTML",
+        }
+      );
+    } catch (error) {
+      console.error("[History] Không thể tạo/gửi file đơn hàng:", error.message);
+      return ctx.reply("❌ Không thể tạo file lúc này. Vui lòng thử lại sau.");
+    } finally {
+      if (file?.filePath) {
+        try { fs.unlinkSync(file.filePath); } catch {}
+      }
+    }
   });
 }
 

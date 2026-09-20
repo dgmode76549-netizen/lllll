@@ -1,5 +1,6 @@
 const db = require("../db/supabase");
 const config = require("../config");
+const crypto = require("crypto");
 const { topupMenu, mainMenu } = require("../keyboards/menus");
 const { buildVietQrUrl, gasGet, startGasTopupWatch } = require("../services/paymentService");
 
@@ -7,13 +8,16 @@ function formatMoney(n) {
   return (Number(n) || 0).toLocaleString("vi-VN");
 }
 
-function generateUniqueCode() {
+async function generateUniqueCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let code = "";
+    const bytes = crypto.randomBytes(10);
+    for (const byte of bytes) code += chars[byte % chars.length];
+    const payContent = `NAP${code}`;
+    if (!(await db.getTransactionByPayContent(payContent))) return code;
   }
-  return code;
+  throw new Error("Không thể tạo mã nạp tiền duy nhất");
 }
 
 async function handleTopupAmount(ctx, bot, amount) {
@@ -24,13 +28,13 @@ async function handleTopupAmount(ctx, bot, amount) {
     return ctx.reply("⚠️ Số tiền nạp tối thiểu là 10.000đ. Vui lòng chọn lại hoặc nhập số tiền hợp lệ!", topupMenu());
   }
 
-  // 1. Chế độ nạp tiền VietQR / Casso
-  const uniqueCode = generateUniqueCode();
+  // 1. Tạo mã thanh toán SePay: NAP + 10 ký tự, không chứa Telegram ID.
+  const uniqueCode = await generateUniqueCode();
   const txId = `TX_${uid}_${uniqueCode}_${Date.now()}`;
-  const payContent = `NAP ${uid} ${uniqueCode}`;
-  const bankCode = config.CASSO_BANK_CODE || "MB";
-  const accNum = config.CASSO_ACCOUNT_NUMBER || "35656568905";
-  const accName = config.CASSO_ACCOUNT_NAME || "PHAM TRUNG DUNG";
+  const payContent = `NAP${uniqueCode}`;
+  const bankCode = config.SEPAY_BANK_CODE || "MBBank";
+  const accNum = config.SEPAY_ACCOUNT_NUMBER || "";
+  const accName = config.SEPAY_ACCOUNT_NAME || "";
   const qrUrl = buildVietQrUrl(bankCode, accNum, amt, payContent);
 
   // Lưu lệnh nạp vào Supabase (hạn 10 phút)

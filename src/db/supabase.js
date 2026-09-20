@@ -554,27 +554,139 @@ async function addAccountInventory(productId, content, addedBy = null) {
   return fdb.accountInventory[id];
 }
 
+async function getAccountInventory(productId = null, includeSold = true) {
+  const id = productId == null ? null : String(productId).trim();
+  if (supabase) {
+    try {
+      let query = supabase.from("account_inventory").select("*").order("id", { ascending: true });
+      if (id) query = query.eq("product_id", id);
+      if (!includeSold) query = query.eq("status", "AVAILABLE");
+      const { data, error } = await query;
+      if (!error && data) {
+        const products = await getAccountProducts(true);
+        const names = new Map(products.map((item) => [String(item.id), item.name]));
+        return data.map((item) => ({ ...item, product_name: names.get(String(item.product_id)) || String(item.product_id) }));
+      }
+      if (error) console.error("Supabase getAccountInventory error:", error.message);
+    } catch (e) {
+      console.error("Supabase getAccountInventory catch:", e.message);
+    }
+    return [];
+  }
+
+  const fdb = loadFallbackDb();
+  const products = fdb.accountProducts || {};
+  return Object.values(fdb.accountInventory || {})
+    .filter((item) => !id || String(item.product_id) === id)
+    .filter((item) => includeSold || String(item.status).toUpperCase() === "AVAILABLE")
+    .map((item) => ({ ...item, product_name: products[item.product_id]?.name || String(item.product_id) }))
+    .sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+async function updateAccountInventory(inventoryId, content) {
+  const id = String(inventoryId || "").trim();
+  const value = String(content || "").trim();
+  if (!id || !value) return null;
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("account_inventory")
+        .update({ content: value })
+        .eq("id", id)
+        .eq("status", "AVAILABLE")
+        .select()
+        .maybeSingle();
+      if (!error && data) return data;
+      if (error) console.error("Supabase updateAccountInventory error:", error.message);
+      return null;
+    } catch (e) {
+      console.error("Supabase updateAccountInventory catch:", e.message);
+      return null;
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  const item = fdb.accountInventory?.[id];
+  if (!item || String(item.status).toUpperCase() !== "AVAILABLE") return null;
+  item.content = value;
+  fdb.accountInventory[id] = item;
+  saveFallbackDb(fdb);
+  return item;
+}
+
+async function deleteAccountInventory(inventoryId) {
+  const id = String(inventoryId || "").trim();
+  if (!id) return { success: false, error: "Thiếu ID nội dung kho" };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("account_inventory")
+        .delete()
+        .eq("id", id)
+        .eq("status", "AVAILABLE")
+        .select("id")
+        .maybeSingle();
+      if (!error && data) return { success: true };
+      if (error) console.error("Supabase deleteAccountInventory error:", error.message);
+      return { success: false, error: error?.message || "Nội dung không tồn tại hoặc đã bán" };
+    } catch (e) {
+      console.error("Supabase deleteAccountInventory catch:", e.message);
+      return { success: false, error: e.message };
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  const item = fdb.accountInventory?.[id];
+  if (!item) return { success: false, error: "Không tìm thấy nội dung kho" };
+  if (String(item.status).toUpperCase() !== "AVAILABLE") return { success: false, error: "Nội dung đã bán, không thể xóa" };
+  delete fdb.accountInventory[id];
+  saveFallbackDb(fdb);
+  return { success: true };
+}
+
+async function updateAccountProduct({ id, name, price, description, deliveryType = "link" }) {
+  const productId = String(id || "").trim();
+  const productName = String(name || "").trim();
+  const productPrice = Number(price);
+  if (!productId || !productName || !Number.isFinite(productPrice) || productPrice < 0) return null;
+  const values = {
+    name: productName,
+    price: productPrice,
+    description: String(description || "").trim(),
+    delivery_type: deliveryType,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("account_products").update(values).eq("id", productId).select().maybeSingle();
+      if (!error && data) return normalizeAccountProduct(data);
+      if (error) console.error("Supabase updateAccountProduct error:", error.message);
+      return null;
+    } catch (e) {
+      console.error("Supabase updateAccountProduct catch:", e.message);
+      return null;
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  if (!fdb.accountProducts?.[productId]) return null;
+  Object.assign(fdb.accountProducts[productId], values);
+  saveFallbackDb(fdb);
+  return normalizeAccountProduct(fdb.accountProducts[productId]);
+}
+
 async function deleteAccountProduct(productId) {
   const id = String(productId || "").trim();
   if (!id) return { success: false, error: "Thiếu ID sản phẩm" };
   if (supabase) {
     try {
-      const { error: deleteError } = await supabase.from("account_products").delete().eq("id", id);
-      if (!deleteError) return { success: true, mode: "deleted" };
-
-      // account_orders giữ khóa ngoại để bảo toàn lịch sử bán hàng.
-      // Nếu đã có đơn, ẩn sản phẩm thay vì xóa cứng.
-      const { data, error: hideError } = await supabase
-        .from("account_products")
-        .update({ active: false, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select("id")
-        .maybeSingle();
-      if (!hideError && data) return { success: true, mode: "hidden" };
-
-      console.error("Supabase deleteAccountProduct error:", deleteError.message);
-      if (hideError) console.error("Supabase hideAccountProduct error:", hideError.message);
-      return { success: false, error: hideError?.message || deleteError.message };
+      const { data, error } = await supabase.from("account_products").delete().eq("id", id).select("id").maybeSingle();
+      if (!error && data) return { success: true, mode: "deleted" };
+      if (error) console.error("Supabase deleteAccountProduct error:", error.message);
+      return { success: false, error: error?.message || "Không tìm thấy sản phẩm" };
     } catch (e) {
       console.error("Supabase deleteAccountProduct catch:", e.message);
       return { success: false, error: e.message };
@@ -583,17 +695,12 @@ async function deleteAccountProduct(productId) {
   const fdb = loadFallbackDb();
   if (!fdb.accountProducts?.[id]) return { success: false, error: "Không tìm thấy sản phẩm" };
 
-  const hasOrders = Object.values(fdb.accountOrders || {}).some((order) => String(order.product_id) === id);
-  if (hasOrders) {
-    fdb.accountProducts[id].active = false;
-    fdb.accountProducts[id].updated_at = new Date().toISOString();
-    saveFallbackDb(fdb);
-    return { success: true, mode: "hidden" };
-  }
-
   delete fdb.accountProducts[id];
   for (const [inventoryId, item] of Object.entries(fdb.accountInventory || {})) {
     if (String(item.product_id) === id) delete fdb.accountInventory[inventoryId];
+  }
+  for (const order of Object.values(fdb.accountOrders || {})) {
+    if (String(order.product_id) === id) order.product_id = null;
   }
   saveFallbackDb(fdb);
   return { success: true, mode: "deleted" };
@@ -713,6 +820,28 @@ async function getUserAccountOrders(telegramId, limit = 10) {
   return Object.values(fdb.accountOrders || {}).filter((order) => Number(order.telegram_id) === tgId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, limit);
 }
 
+async function getUserAccountOrder(telegramId, orderId) {
+  const tgId = Number(telegramId);
+  const id = String(orderId || "").trim();
+  if (!id) return null;
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("account_orders")
+        .select("*")
+        .eq("id", id)
+        .eq("telegram_id", tgId)
+        .maybeSingle();
+      if (!error && data) return data;
+      if (error) console.error("Supabase getUserAccountOrder error:", error.message);
+    } catch (e) { console.error("Supabase getUserAccountOrder catch:", e.message); }
+    return null;
+  }
+  const fdb = loadFallbackDb();
+  const order = fdb.accountOrders?.[id];
+  return order && Number(order.telegram_id) === tgId ? order : null;
+}
+
 async function getRecentAccountOrders(limit = 20) {
   if (supabase) {
     try {
@@ -773,7 +902,9 @@ function buildAccountStats(products, inventory, orders, today) {
     else row.available += 1;
   }
   for (const order of completed) {
-    const key = String(order.product_id);
+    const key = order.product_id == null
+      ? `deleted:${String(order.product_name || "unknown")}`
+      : String(order.product_id);
     if (!byProduct.has(key)) byProduct.set(key, { productId: order.product_id, productName: order.product_name || key, available: 0, sold: 0, orders: 0, revenue: 0 });
     const row = byProduct.get(key);
     row.orders += 1;
@@ -892,6 +1023,88 @@ async function getTransaction(txId) {
   return fdb.transactions?.[txId] || null;
 }
 
+async function getTransactionByPayContent(payContent) {
+  const content = String(payContent || "").trim();
+  if (!content) return null;
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("id,pay_content,status")
+        .eq("pay_content", content)
+        .limit(1)
+        .maybeSingle();
+      if (!error && data) return data;
+    } catch (e) {
+      console.error("Supabase getTransactionByPayContent catch:", e.message);
+    }
+  }
+  return Object.values(loadFallbackDb().transactions || {}).find((tx) => String(tx.pay_content) === content) || null;
+}
+
+/**
+ * Hoàn tất nạp tiền bằng RPC nguyên tử: khóa transaction, cộng ví, cộng
+ * total_deposited và chuyển DONE trong cùng một transaction PostgreSQL.
+ */
+async function completeTopupTransaction(txId) {
+  const id = String(txId || "").trim();
+  if (!id) return { success: false, error: "Thiếu mã giao dịch" };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.rpc("complete_topup_transaction", {
+        p_transaction_id: id,
+      });
+      if (error) {
+        console.error("Supabase completeTopupTransaction error:", error.message);
+        return { success: false, error: error.message, requiresSchema: true };
+      }
+
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) return { success: false, error: "RPC không trả về kết quả" };
+      return {
+        success: Boolean(row.success),
+        alreadyDone: row.status === "DONE" && !row.success,
+        status: row.status,
+        telegramId: Number(row.telegram_id),
+        amount: Number(row.amount) || 0,
+        newBalance: Number(row.new_balance) || 0,
+        payContent: row.pay_content || "",
+        error: row.success ? null : `Giao dịch đang ở trạng thái ${row.status}`,
+      };
+    } catch (e) {
+      console.error("Supabase completeTopupTransaction catch:", e.message);
+      return { success: false, error: e.message, requiresSchema: true };
+    }
+  }
+
+  const fdb = loadFallbackDb();
+  const tx = fdb.transactions?.[id];
+  if (!tx) return { success: false, error: "Không tìm thấy giao dịch" };
+  if (tx.status === "DONE") return { success: false, alreadyDone: true, status: "DONE" };
+  if (tx.status !== "PROCESSING") return { success: false, status: tx.status, error: `Giao dịch đang ở trạng thái ${tx.status}` };
+
+  const userKey = String(tx.telegram_id);
+  const user = fdb.users?.[userKey];
+  if (!user) return { success: false, error: "Không tìm thấy người dùng" };
+
+  const amount = Number(tx.amount) || 0;
+  user.balance = (Number(user.balance) || 0) + amount;
+  user.total_deposited = (Number(user.total_deposited) || 0) + amount;
+  user.updated_at = new Date().toISOString();
+  tx.status = "DONE";
+  tx.paid_at = new Date().toISOString();
+  saveFallbackDb(fdb);
+  return {
+    success: true,
+    status: "DONE",
+    telegramId: Number(tx.telegram_id),
+    amount,
+    newBalance: Number(user.balance),
+    payContent: tx.pay_content || "",
+  };
+}
+
 // ==========================================
 // 4. ADMIN HELPERS
 // ==========================================
@@ -1001,15 +1214,22 @@ module.exports = {
   getAccountProduct,
   createAccountProduct,
   addAccountInventory,
+  getAccountInventory,
+  updateAccountInventory,
+  deleteAccountInventory,
+  updateAccountProduct,
   deleteAccountProduct,
   setAccountProductActive,
   purchaseAccountProduct,
   createAccountOrder,
   getUserAccountOrders,
+  getUserAccountOrder,
   getRecentAccountOrders,
   getAccountStats,
   createTransaction,
   completeTransaction,
   getTransaction,
+  getTransactionByPayContent,
+  completeTopupTransaction,
   getAdminStats,
 };

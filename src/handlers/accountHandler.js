@@ -1,6 +1,7 @@
 const db = require("../db/supabase");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const {
   mainMenu,
   accountProductSelectionKeyboard,
@@ -41,6 +42,29 @@ function deliveryText(value) {
   const content = String(value || "").trim();
   if (!content) return "—";
   return `<pre>${escapeHtml(content)}</pre>`;
+}
+
+function deliveryFileName(productName, orderId) {
+  const safeProduct = String(productName || "san-pham")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 45) || "san-pham";
+  const safeOrder = String(orderId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 35);
+  return `${safeProduct}-${safeOrder}.txt`;
+}
+
+function createDeliveryFile(productName, orderId, delivery) {
+  const fileName = deliveryFileName(productName, orderId);
+  const filePath = path.join(os.tmpdir(), `tg-bot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${fileName}`);
+  const content = String(delivery || "").trim();
+  fs.writeFileSync(
+    filePath,
+    `SẢN PHẨM: ${productName}\nMÃ ĐƠN: ${orderId}\n========================================\n\n${content}\n`,
+    "utf8"
+  );
+  return { filePath, fileName };
 }
 
 function registerAccountHandler(bot) {
@@ -123,17 +147,34 @@ function registerAccountHandler(bot) {
       const result = await db.purchaseAccountProduct(ctx.from.id, productId);
       if (!result.success) return ctx.reply(`❌ Không thể mua sản phẩm: ${escapeHtml(result.error || "Vui lòng thử lại")}`);
       const orderId = result.order?.id || "—";
-      return ctx.reply(
-        `🎉 <b>MUA ACC THÀNH CÔNG</b>\n` +
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `📦 <b>Sản phẩm:</b> ${escapeHtml(product.name)}\n` +
-          `💵 <b>Đã thanh toán:</b> ${money(price)}đ\n` +
-          `💰 <b>Số dư còn lại:</b> ${money(result.newBalance)}đ\n` +
-          `🧾 <b>Mã đơn:</b> <code>${escapeHtml(orderId)}</code>\n\n` +
-          `📦 <b>Nội dung sản phẩm:</b>\n${deliveryText(result.delivery)}\n\n` +
-          `Đơn hàng đã được lưu vào lịch sử mua hàng.`,
-        { parse_mode: "HTML", ...mainMenu(ctx.from.id) }
-      );
+      const caption =
+        `🎉 <b>MUA SẢN PHẨM THÀNH CÔNG</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Sản phẩm:</b> ${escapeHtml(product.name)}\n` +
+        `💵 <b>Đã thanh toán:</b> ${money(price)}đ\n` +
+        `💰 <b>Số dư còn lại:</b> ${money(result.newBalance)}đ\n` +
+        `🧾 <b>Mã đơn:</b> <code>${escapeHtml(orderId)}</code>\n\n` +
+        `📄 Nội dung sản phẩm đã được đóng thành file TXT và gửi kèm bên dưới.\n` +
+        `Đơn hàng đã được lưu vào lịch sử mua hàng.`;
+
+      let deliveryFile = null;
+      try {
+        deliveryFile = createDeliveryFile(product.name, orderId, result.delivery);
+        return await ctx.replyWithDocument(
+          { source: deliveryFile.filePath, filename: deliveryFile.fileName },
+          { caption, parse_mode: "HTML", ...mainMenu(ctx.from.id) }
+        );
+      } catch (fileError) {
+        console.error("[Account Handler] Không thể tạo/gửi file sản phẩm:", fileError.message);
+        return ctx.reply(
+          `${caption}\n\n⚠️ Không thể gửi file lúc này. Vui lòng liên hệ admin để nhận lại nội dung.`,
+          { parse_mode: "HTML", ...mainMenu(ctx.from.id) }
+        );
+      } finally {
+        if (deliveryFile?.filePath) {
+          try { fs.unlinkSync(deliveryFile.filePath); } catch {}
+        }
+      }
     } catch (error) {
       console.error("[Account Handler] Lỗi mua acc:", error.message);
       return ctx.reply("❌ Có lỗi khi xử lý đơn mua. Vui lòng thử lại sau.");

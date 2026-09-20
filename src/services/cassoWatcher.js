@@ -17,7 +17,7 @@ function startCassoWatcher(bot) {
   if (isWatching) return;
   isWatching = true;
 
-  console.log("👀 [Casso Watcher] Đã kích hoạt tiến trình tự động quét giao dịch từ Supabase...");
+  console.log("👀 [SePay Watcher] Đã kích hoạt tiến trình tự động quét giao dịch từ Supabase...");
 
   let cleanupCounter = 0;
 
@@ -33,7 +33,7 @@ function startCassoWatcher(bot) {
         await cleanupExpiredPendingTransactions();
       }
     } catch (err) {
-      console.error("[Casso Watcher] Lỗi quét giao dịch:", err.message);
+      console.error("[SePay Watcher] Lỗi quét giao dịch:", err.message);
     } finally {
       isProcessing = false;
     }
@@ -56,10 +56,10 @@ async function recoverProcessingTransactions() {
       .select("id");
 
     if (!error && data?.length) {
-      console.log(`[Casso Watcher] Đã mở lại ${data.length} lệnh nạp bị treo.`);
+      console.log(`[SePay Watcher] Đã mở lại ${data.length} lệnh nạp bị treo.`);
     }
   } catch (err) {
-    console.error("[Casso Watcher] Không thể khôi phục lệnh nạp bị treo:", err.message);
+    console.error("[SePay Watcher] Không thể khôi phục lệnh nạp bị treo:", err.message);
   }
 
   try {
@@ -68,30 +68,31 @@ async function recoverProcessingTransactions() {
       .update({ status: "PENDING" })
       .eq("status", "PROCESSING");
   } catch (err) {
-    console.error("[Casso Watcher] Không thể khôi phục log Casso bị treo:", err.message);
+    console.error("[SePay Watcher] Không thể khôi phục log SePay bị treo:", err.message);
   }
 }
 
 /**
- * Tự động xóa các lệnh nạp PENDING đã quá 10 phút (sau 10p tự xóa)
+ * Đánh dấu các lệnh nạp PENDING đã quá 10 phút là EXPIRED.
+ * Giữ lại mã NAP để không tái sử dụng mã thanh toán cũ.
  */
 async function cleanupExpiredPendingTransactions() {
   if (!db.supabase) return;
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
   try {
-    const { data: deleted, error } = await db.supabase
+    const { data: expired, error } = await db.supabase
       .from("transactions")
-      .delete()
+      .update({ status: "EXPIRED" })
       .eq("status", "PENDING")
       .lt("created_at", tenMinutesAgo)
       .select("id, pay_content");
 
-    if (!error && deleted && deleted.length > 0) {
-      console.log(`[Casso Watcher] Đã tự động xóa ${deleted.length} lệnh nạp quá hạn 10 phút:`, deleted.map(d => d.id).join(", "));
+    if (!error && expired && expired.length > 0) {
+      console.log(`[SePay Watcher] Đã đánh dấu ${expired.length} lệnh nạp hết hạn:`, expired.map(d => d.id).join(", "));
     }
   } catch (err) {
-    console.error("[Casso Watcher] Lỗi xóa lệnh nạp hết hạn:", err.message);
+    console.error("[SePay Watcher] Lỗi đánh dấu lệnh nạp hết hạn:", err.message);
   }
 }
 
@@ -158,67 +159,13 @@ async function processPendingTransactions(bot) {
           continue;
         }
 
-        // Tạm khóa trạng thái để tránh xử lý trùng. Nếu giao dịch đã bị tiến trình khác khóa thì bỏ qua.
-        const { data: lockedRows, error: lockError } = await db.supabase
+        // Chỉ cộng tiền từ bảng transactions đã được webhook khớp chính xác.
+        // Không tự suy ra Telegram ID từ log ngân hàng cũ, tránh cộng nhầm.
+        await db.supabase
           .from("casso_transactions")
-          .update({ status: "PROCESSING" })
+          .update({ status: "UNMATCHED" })
           .eq("id", tx.id)
-          .eq("status", "PENDING")
-          .select("id");
-        if (lockError || !lockedRows?.length) continue;
-
-        try {
-          // Cộng tiền cho khách
-          const balRes = await db.changeUserBalance(tx.telegram_id, tx.amount);
-          if (balRes.success) {
-            await db.supabase.from("casso_transactions").update({
-              status: "DONE",
-              processed_at: new Date().toISOString(),
-            }).eq("id", tx.id).eq("status", "PROCESSING");
-
-            // Cập nhật total_deposited
-            const user = await db.getUser(tx.telegram_id);
-            if (user) {
-              await db.supabase
-                .from("users")
-                .update({ total_deposited: (Number(user.total_deposited) || 0) + Number(tx.amount) })
-                .eq("telegram_id", tx.telegram_id);
-            }
-
-            await notifyAdminsTopupSuccess(bot, {
-              telegramId: tx.telegram_id,
-              amount: tx.amount,
-              newBalance: balRes.newBalance,
-              transactionId: tx.id,
-              payContent: tx.description,
-              user,
-            });
-
-            // Gửi thông báo Telegram cho khách
-            try {
-              await bot.telegram.sendMessage(
-                tx.telegram_id,
-                `🎉 <b>NẠP TIỀN THÀNH CÔNG QUA CASSO!</b>\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `💳 <b>Số tiền:</b> +${formatMoney(tx.amount)}đ\n` +
-                `💰 <b>Số dư mới:</b> <code>${formatMoney(balRes.newBalance)}đ</code>\n` +
-                `📌 <b>Nội dung:</b> ${tx.description || "—"}\n` +
-                `🧾 <b>Mã giao dịch:</b> <code>${tx.id}</code>\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `Hệ thống đã tự động cộng tiền vào ví. Bạn có thể thuê OTP Shopee ngay! 🙏`,
-                { parse_mode: "HTML" }
-              );
-            } catch (msgErr) {
-              console.error(`Không thể gửi tin báo nạp cho UID ${tx.telegram_id}:`, msgErr.message);
-            }
-          } else {
-            await db.supabase.from("casso_transactions").update({ status: "FAILED" }).eq("id", tx.id).eq("status", "PROCESSING");
-          }
-        } catch (err) {
-          // Không để lỗi giữa chừng làm lệnh nằm vĩnh viễn ở PROCESSING.
-          await db.supabase.from("casso_transactions").update({ status: "PENDING" }).eq("id", tx.id).eq("status", "PROCESSING");
-          console.error(`[Casso Watcher] Lỗi xử lý giao dịch ${tx.id}:`, err.message);
-        }
+          .eq("status", "PENDING");
       }
     }
   } catch {}
@@ -245,53 +192,59 @@ async function processPendingTransactions(bot) {
         if (lockError || !lockedRows?.length) continue;
 
         try {
-          const balRes = await db.changeUserBalance(tx.telegram_id, tx.amount);
-          if (balRes.success) {
-            await db.supabase.from("transactions").update({
-              status: "DONE",
-              paid_at: new Date().toISOString(),
-            }).eq("id", tx.id).eq("status", "PROCESSING");
+          // RPC khóa transaction và cộng tiền trong cùng một transaction DB.
+          // Nếu webhook lặp hoặc bot chạy hai instance, chỉ một lần được success=true.
+          const completed = await db.completeTopupTransaction(tx.id);
+          if (!completed.success) {
+            if (completed.alreadyDone) continue;
+            await db.supabase
+              .from("transactions")
+              .update({ status: "PENDING_CREDIT" })
+              .eq("id", tx.id)
+              .eq("status", "PROCESSING");
+            console.error(`[SePay Watcher] Chưa thể hoàn tất giao dịch ${tx.id}:`, completed.error || completed.status);
+            continue;
+          }
 
-            const user = await db.getUser(tx.telegram_id);
-            if (user) {
-              await db.supabase
-                .from("users")
-                .update({ total_deposited: (Number(user.total_deposited) || 0) + Number(tx.amount) })
-                .eq("telegram_id", tx.telegram_id);
-            }
+          const telegramId = completed.telegramId || tx.telegram_id;
+          const user = await db.getUser(telegramId);
 
-            await notifyAdminsTopupSuccess(bot, {
-              telegramId: tx.telegram_id,
-              amount: tx.amount,
-              newBalance: balRes.newBalance,
-              transactionId: tx.id,
-              payContent: tx.pay_content,
-              user,
-            });
+          // Gửi thông báo sau khi DB đã xác nhận cộng tiền thành công.
+          // adminNotifier tự loại Telegram ID của người nạp để không gửi trùng.
+          await notifyAdminsTopupSuccess(bot, {
+            telegramId,
+            amount: completed.amount || tx.amount,
+            newBalance: completed.newBalance,
+            transactionId: tx.id,
+            payContent: completed.payContent || tx.pay_content,
+            user,
+          });
 
-            try {
-              await bot.telegram.sendMessage(
-                tx.telegram_id,
-                `🎉 <b>NẠP TIỀN THÀNH CÔNG!</b>\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `💳 <b>Số tiền:</b> +${formatMoney(tx.amount)}đ\n` +
-                `💰 <b>Số dư mới:</b> <code>${formatMoney(balRes.newBalance)}đ</code>\n` +
-                `📌 <b>Nội dung:</b> ${tx.pay_content || "—"}\n` +
-                `🧾 <b>Mã giao dịch:</b> <code>${tx.id}</code>\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `Hệ thống đã tự động cộng tiền vào ví. Bạn có thể thuê OTP Shopee ngay! 🙏`,
-                { parse_mode: "HTML" }
-              );
-            } catch (msgErr) {
-              console.error(`Không thể gửi tin báo nạp cho UID ${tx.telegram_id}:`, msgErr.message);
-            }
-          } else {
-            await db.supabase.from("transactions").update({ status: "FAILED" }).eq("id", tx.id).eq("status", "PROCESSING");
+          try {
+            await bot.telegram.sendMessage(
+              telegramId,
+              `🎉 <b>NẠP TIỀN THÀNH CÔNG!</b>\n` +
+              `━━━━━━━━━━━━━━━━━━━━\n` +
+              `💳 <b>Số tiền:</b> +${formatMoney(completed.amount || tx.amount)}đ\n` +
+              `💰 <b>Số dư mới:</b> <code>${formatMoney(completed.newBalance)}đ</code>\n` +
+              `📌 <b>Nội dung:</b> ${completed.payContent || tx.pay_content || "—"}\n` +
+              `🧾 <b>Mã giao dịch:</b> <code>${tx.id}</code>\n` +
+              `━━━━━━━━━━━━━━━━━━━━\n` +
+              `Hệ thống đã tự động cộng tiền vào ví. Bạn có thể thuê OTP Shopee ngay! 🙏`,
+              { parse_mode: "HTML" }
+            );
+          } catch (msgErr) {
+            console.error(`Không thể gửi tin báo nạp cho UID ${telegramId}:`, msgErr.message);
           }
         } catch (err) {
-          // Không để lỗi giữa chừng làm lệnh nằm vĩnh viễn ở PROCESSING.
-          await db.supabase.from("transactions").update({ status: "PENDING_CREDIT" }).eq("id", tx.id).eq("status", "PROCESSING");
-          console.error(`[Casso Watcher] Lỗi xử lý giao dịch ${tx.id}:`, err.message);
+          // Nếu RPC lỗi trước khi commit, đưa về PENDING_CREDIT để thử lại.
+          // Nếu RPC đã commit thì điều kiện PROCESSING không cho phép thay đổi DONE.
+          await db.supabase
+            .from("transactions")
+            .update({ status: "PENDING_CREDIT" })
+            .eq("id", tx.id)
+            .eq("status", "PROCESSING");
+          console.error(`[SePay Watcher] Lỗi xử lý giao dịch ${tx.id}:`, err.message);
         }
       }
     }

@@ -7,16 +7,17 @@ const fetchFn = (...args) => {
 };
 
 function buildVietQrUrl(bank, acc, amount, payContent) {
-  const bankCode = bank || config.CASSO_BANK_CODE || "MB";
-  // Mã BIN chuẩn Napas của MBBank trên Casso/VietQR là 970422
-  const bin = (bankCode === "MB" || bankCode === "MBBank") ? "970422" : bankCode;
-  const accNumber = acc || config.CASSO_ACCOUNT_NUMBER || "35656568905";
-  const template = config.CASSO_QR_TEMPLATE || "compact2";
-  const accName = encodeURIComponent(config.CASSO_ACCOUNT_NAME || "PHAM TRUNG DUNG");
-  const des = encodeURIComponent(payContent);
-  const amt = encodeURIComponent(amount);
-
-  return `https://img.vietqr.io/image/${bin}-${accNumber}-${template}.png?amount=${amt}&addInfo=${des}&accountName=${accName}`;
+  const aliases = { MB: "MBBank", MBBANK: "MBBank", VCB: "Vietcombank" };
+  const rawBankCode = String(bank || config.SEPAY_BANK_CODE || "MBBank").trim();
+  const bankCode = aliases[rawBankCode.toUpperCase()] || rawBankCode;
+  const accNumber = String(acc || config.SEPAY_ACCOUNT_NUMBER || "").trim();
+  const baseUrl = config.SEPAY_QR_BASE_URL || "https://vietqr.app/img";
+  const url = new URL(baseUrl);
+  url.searchParams.set("acc", accNumber);
+  url.searchParams.set("bank", bankCode);
+  url.searchParams.set("amount", String(Number(amount) || 0));
+  url.searchParams.set("des", String(payContent || ""));
+  return url.toString();
 }
 
 async function gasGet(params) {
